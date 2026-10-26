@@ -1,0 +1,9 @@
+network = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/inferred-networks/n15/15/camus_f05_astral_iqtree.nwk"
+gene_trees = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/rooted-camus-dataset/n15/15/iqtree_500-rooted.nwk"
+output = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/inferred-phylonet-camus-o/n15/15"
+threads = 32
+phylonet_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/PhyloNet.jar"
+dry_run = false
+reticulations = 1
+fixed = false
+o_flag = true

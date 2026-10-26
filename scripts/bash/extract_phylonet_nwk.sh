@@ -1,0 +1,1 @@
+python /u/quadros3/research/phylogeny/project_01/experiment_01/1a/scripts/src/extract_phylonet_nwk.py /u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/inferred-phylonet -s phylonet_output_iqtree_500-rooted_camus_f05_astral_iqtree_1.txt -o phylonet-camus_f05_astral_iqtree-1.nwk

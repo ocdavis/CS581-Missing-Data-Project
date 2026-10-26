@@ -1,0 +1,10 @@
+network = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/rooted-camus-dataset/n15"
+gene_trees = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/rooted-camus-dataset/n15"
+output = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/inferred-phylonet-true/n15"
+threads = 32
+phylonet_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/PhyloNet.jar"
+dry_run = false
+gene_tree_method = "g_true-rooted.nwk"
+network_method = "true_net-rooted.nwk"
+reticulations = 1
+fixed = false

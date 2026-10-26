@@ -1,0 +1,2 @@
+python /u/quadros3/research/phylogeny/project_01/experiment_01/1a/scripts/src/scatter_plot_rank.py -c /u/quadros3/research/phylogeny/project_01/experiment_01/1a/scripts/config/scatter_plot_rank/scatter_plot_rank_n15_camus_threshold.toml
+python /u/quadros3/research/phylogeny/project_01/experiment_01/1a/scripts/src/calculate_cc.py -i /u/quadros3/research/phylogeny/project_01/experiment_01/1a/output/n15/threshold/combined_mpl_fa.csv -o /u/quadros3/research/phylogeny/project_01/experiment_01/1a/output/n15/threshold

@@ -1,0 +1,6 @@
+input_csv = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15/cmpnets_dataframe.csv"
+ranks_csv = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15/cmpnets_false_average.csv"
+output_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_similarity/n15"
+phylonet_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/PhyloNet.jar"
+mode = "cluster"
+dry_run = false

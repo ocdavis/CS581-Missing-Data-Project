@@ -1,0 +1,4 @@
+calgtprob_input = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_calgtprob/n15/calgtprob_ranked_threshold_2.csv"
+cmpnets_input = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15/cmpnets_false_average.csv"
+output_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output/n15/threshold"
+methods = ["CAMUS", "PhyloNET", "PhyloNET-FT", "SNaQ", "PhyloNET (CAMUS)", "SNaQ (CAMUS)"]

@@ -1,0 +1,16 @@
+input_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15"
+output_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15"
+
+file_names = [
+    "cmpnets_output_camus_f05_astral_iqtree.txt",
+    "cmpnets_output_phylonet_ft-astral-iqtree-1.txt",
+    "cmpnets_output_phylonet-astral-iqtree-1.txt",
+    "cmpnets_output_reroot-snaq-astral-iqtree-1.txt"
+]
+
+[method_labels]
+"cmpnets_output_camus_f05_astral_iqtree.txt" = "CAMUS"
+"cmpnets_output_phylonet_ft-astral-iqtree-1.txt" = "PhyloNET-FT"
+"cmpnets_output_phylonet-astral-iqtree-1.txt" = "PhyloNET"
+"cmpnets_output_reroot-snaq-astral-iqtree-1.txt" = "SNaQ"
+

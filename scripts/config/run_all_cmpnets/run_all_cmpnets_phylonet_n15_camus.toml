@@ -1,0 +1,8 @@
+true_network = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/camus-dataset/n15"
+computed_network = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/inferred-phylonet/n15"
+output = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15"
+mode = "cluster"
+phylonet_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/PhyloNet.jar"
+dry_run = false
+true_net_name = "true_net.nwk"
+network_methods = ["phylonet-camus_f05_astral_iqtree-1.nwk"]

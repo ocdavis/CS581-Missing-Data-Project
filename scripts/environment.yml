@@ -1,0 +1,12 @@
+name: scripts
+channels:
+  - defaults
+  - bioconda
+  - conda-forge
+dependencies:
+  - python
+  - pandas
+  - seaborn
+  - treeswift
+  - Jinja2
+

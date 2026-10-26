@@ -1,0 +1,3 @@
+
+
+python3  /u/quadros3/research/phylogeny/project_01/experiment_01/1a/scripts/src/run_all_cmpnets.py -cn /u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/inferred-networks/n25 -tn /u/quadros3/research/phylogeny/project_01/experiment_01/1a/data/camus-dataset/n25 -o /u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n25 -m cluster -p /u/quadros3/research/phylogeny/project_01/experiment_01/1a/PhyloNet.jar

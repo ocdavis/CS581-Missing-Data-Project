@@ -1,0 +1,6 @@
+networks_csv = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_similarity/n15/same_network_groups.csv"
+errors_csv = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_cmpnets/n15/cmpnets_dataframe.csv"
+mpl_csv = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output_calgtprob/n15/calgtprob_dataframe.csv"
+output_path = "/u/quadros3/research/phylogeny/project_01/experiment_01/1a/output/n15/snaq_cmp.txt"
+method1 = "SNaQ"
+method2 = "SNaQ (CAMUS)"
