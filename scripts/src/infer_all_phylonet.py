@@ -1,6 +1,6 @@
 import argparse
 import os
-from utils import load_config, sanitize_network
+from utils import load_config
 from pathlib import Path
 
 CONFIG_HELP = r"""
@@ -59,7 +59,7 @@ def create_nexus_file(path, gts, st, nret, threads, fixed, o_flag):
 
 BEGIN NETWORKS;
 
-Network st = {sanitize_network(f_st.read().strip())}
+Network st = {f_st.read().strip()}
 
 END;
 
