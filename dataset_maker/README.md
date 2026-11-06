@@ -13,8 +13,10 @@ Handles both sequential and interleaved PHYLIP layouts. Sequences shorter
 than the target length are left unchanged (no padding).
 
 Files are processed in parallel with a process pool (`--workers`, default:
-all cores); each file is parsed once and written once per length. A progress
-bar is shown when tqdm is installed, otherwise a plain counter is printed.
+all cores); each file is parsed once and written once per length. Files are
+streamed from the directory walk with only a bounded window of tasks in
+flight, so memory stays flat regardless of dataset size. A progress bar is
+shown when tqdm is installed, otherwise a plain counter is printed.
 
 ### Usage
 

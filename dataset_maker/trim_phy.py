@@ -18,8 +18,11 @@ Usage::
         --lengths 100 250 500 --workers 8
 
 Files are processed in parallel with a process pool (``--workers``, default:
-all cores). Each file is parsed once and written once per length. A progress
-bar is shown when tqdm is installed; otherwise a plain counter is printed.
+all cores). Each file is parsed once and written once per length. Files are
+streamed from the directory walk with only a bounded window of tasks in
+flight, so memory stays flat regardless of dataset size. Progress is shown
+as a live bar on a terminal, or as periodic percentage lines when the output
+is piped or redirected.
 
 The parsing / trimming / writing steps are separate functions so they can be
 reused or overridden from other scripts.
@@ -31,10 +34,11 @@ import argparse
 import os
 import sys
 import tomllib
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
 try:
     from tqdm import tqdm
@@ -167,44 +171,82 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
     return dsts
 
 
-def _progress(iterable, total: int, desc: str):
-    """Wrap ``iterable`` with tqdm if available, else yield items unchanged."""
-    if tqdm is not None:
-        return tqdm(iterable, total=total, desc=desc, unit="file")
-    return iterable
-
-
-def _print_fallback_progress(done: int, total: int, desc: str) -> None:
-    if tqdm is None and (done % 25 == 0 or done == total):
-        print(f"\r{desc}: {done}/{total} files", end="" if done < total else "\n",
-              file=sys.stderr)
-
-
 def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
         workers: int | None = None) -> None:
-    files = list(find_phy_files(input_dir))
-    if not files:
+    """Stream files from ``input_dir`` and process them in parallel.
+
+    Files are never all held in memory: the directory walk is consumed
+    lazily and only ``workers * 4`` tasks are in flight at any time. A quick
+    metadata-only pre-walk counts the files up front so the progress bar can
+    show a percentage.
+
+    Progress reporting adapts to the output: a live tqdm bar when stderr is
+    a terminal, and periodic one-line-per-update progress messages when the
+    output is piped or redirected (where ``\\r``-based bars cannot render).
+    """
+    total = sum(1 for _ in find_phy_files(input_dir))
+    if total == 0:
         print(f"warning: no .phy files found under {input_dir}", file=sys.stderr)
         return
 
     if workers is None:
         workers = os.cpu_count() or 1
-    workers = max(1, min(workers, len(files)))
+    workers = max(1, min(workers, total))
 
-    desc = f"trimming ({len(lengths)} lengths)"
-    if workers == 1:
-        for done, src in enumerate(_progress(files, len(files), desc), 1):
-            process_file(src, input_dir, output_dir, lengths)
-            _print_fallback_progress(done, len(files), desc)
-        return
+    desc = f"trimming {total} files ({len(lengths)} lengths)"
+    is_tty = sys.stderr.isatty()
+    pbar = (tqdm(total=total, desc=desc, unit="file")
+            if tqdm is not None and is_tty else None)
+    done_count = 0
+    last_reported = 0
+    # When piped, report every ~2% so logs show incremental progress
+    # without flooding them.
+    report_step = max(1, total // 50)
 
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(process_file, src, input_dir, output_dir, lengths)
-                   for src in files]
-        for done, future in enumerate(
-                _progress(as_completed(futures), len(files), desc), 1):
-            future.result()  # propagate worker exceptions
-            _print_fallback_progress(done, len(files), desc)
+    def advance(n: int) -> None:
+        nonlocal done_count, last_reported
+        done_count += n
+        if pbar is not None:
+            pbar.update(n)
+        elif is_tty:
+            # No tqdm installed: simple in-place counter on a terminal.
+            print(f"\r{desc}: {done_count}/{total} files",
+                  end="" if done_count < total else "\n",
+                  file=sys.stderr, flush=True)
+        elif done_count - last_reported >= report_step or done_count == total:
+            # Piped/redirected: newline-delimited updates that survive logs.
+            pct = 100 * done_count / total
+            print(f"{desc}: {done_count}/{total} files ({pct:.0f}%)",
+                  file=sys.stderr, flush=True)
+            last_reported = done_count
+
+    try:
+        if workers == 1:
+            for src in find_phy_files(input_dir):
+                process_file(src, input_dir, output_dir, lengths)
+                advance(1)
+            return
+
+        # Bounded window of in-flight futures; the walk is consumed lazily.
+        max_in_flight = workers * 4
+        file_iter: Iterator[Path] = iter(find_phy_files(input_dir))
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            pending = {
+                pool.submit(process_file, src, input_dir, output_dir, lengths)
+                for src in islice(file_iter, max_in_flight)
+            }
+            while pending:
+                finished, pending = wait(pending, return_when=FIRST_COMPLETED)
+                for future in finished:
+                    future.result()  # propagate worker exceptions
+                advance(len(finished))
+                for src in islice(file_iter, len(finished)):
+                    pending.add(
+                        pool.submit(process_file, src, input_dir, output_dir,
+                                    lengths))
+    finally:
+        if pbar is not None:
+            pbar.close()
 
 
 def load_config(config_path: Path) -> dict:
