@@ -1,0 +1,11 @@
+# Example config for trim_phy.py
+# Paths are resolved relative to the directory the script is run from.
+
+input_dir = "data/camus-dataset/n50"
+output_dir = "data/trimmed"
+
+# One output dataset is produced per length, under output_dir/len_<L>/
+lengths = [100, 250, 500]
+
+# Parallel worker processes (optional; default = all cores)
+# workers = 8
