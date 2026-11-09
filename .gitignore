@@ -1,0 +1,11 @@
+# Downloaded CAMUS dataset archive and its extracted / generated data
+camus_dataset/
+data/
+DOI-10-13012-b2idb-6892704_v1.zip
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Alpha/beta sweep version of the TOB-QMC runner (not shared yet)
+tob_qmc/sweep/
