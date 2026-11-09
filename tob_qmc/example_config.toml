@@ -1,0 +1,27 @@
+# Example config for run_tob_qmc.py
+# Paths are resolved relative to the directory the script is run from.
+
+# tree-qmc executable (name on PATH, or a full path). It must be built with
+# tree-of-blobs support; see README.md.
+tree_qmc = "tree-qmc"
+
+# Every file under input_dir matching gene_tree_glob is one TOB-QMC input
+# (all gene trees of one replicate, one Newick tree per line).
+# This example uses the true gene trees that come with the CAMUS dataset.
+input_dir = "data/camus-dataset/n50"
+gene_tree_glob = "g_true.nwk"
+
+# The ToB for <input_dir>/<rep>/g_true.nwk is written to
+# <output_dir>/<rep>/g_true.tob.tre (with a g_true.tob.log next to it).
+output_dir = "results/tob_qmc"
+
+# TOB-QMC's default significance levels for the tree test and star test.
+alpha = 1e-7
+beta = 0.95
+
+# Exhaustive search for the minimum p-value around each branch
+# (--iter_limit_blob 0). Set to false for TOB-QMC's default search.
+exhaustive = true
+
+# Taxon used to root the output tree.
+outgroup = "OUT"

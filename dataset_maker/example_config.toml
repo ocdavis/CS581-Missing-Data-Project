@@ -4,8 +4,25 @@
 input_dir = "data/camus-dataset/n50"
 output_dir = "data/trimmed"
 
+# --- Shortened sequences (gene tree estimation error) ----------------------
 # One output dataset is produced per length, under output_dir/len_<L>/
+# All taxa are kept in these copies. Use lengths = [] to skip.
 lengths = [100, 250, 500]
+
+# --- Missing taxa (incomplete gene trees) ----------------------------------
+# One output dataset is produced per percentage, under output_dir/miss_<P>/
+# In every .phy file, P% of the ingroup taxa are removed (rows dropped), with
+# an independent random subset drawn for each file. With 50 ingroup taxa,
+# 20 -> 10 taxa removed (41 rows left), 50 -> 25 removed (26 rows left).
+# Sequences keep their full length in these copies. Omit or leave empty to skip.
+missing_percents = [20, 50]
+
+# Taxon that is never removed and is not counted toward the percentage.
+outgroup = "OUT"
+
+# Seed for the taxon removal. The same seed always reproduces the same
+# dataset, regardless of the number of workers.
+seed = 581
 
 # Parallel worker processes (optional; default = all cores)
 # workers = 8

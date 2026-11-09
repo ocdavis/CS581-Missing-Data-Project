@@ -11,11 +11,23 @@ is produced per length::
 
     output_dir / f"len_{length}" / <relative path of the input file>
 
+It can also supply a list of missing-taxa percentages. For each percentage,
+one full-length copy of the dataset is produced in which every file has that
+percentage of its ingroup taxa (everything except the outgroup) removed, with
+an independent random subset drawn for each file::
+
+    output_dir / f"miss_{percent}" / <relative path of the input file>
+
+The two kinds of variant are not crossed: ``len_*`` copies keep every taxon
+and ``miss_*`` copies keep the full sequence length.
+
 Usage::
 
     python3 trim_phy.py --config example_config.toml
     python3 trim_phy.py --input data/camus-dataset/n50 --output data/trimmed \
         --lengths 100 250 500 --workers 8
+    python3 trim_phy.py --input data/camus-dataset/n50 --output data/trimmed \
+        --lengths 100 250 500 --missing 20 50 --outgroup OUT --seed 581
 
 Files are processed in parallel with a process pool (``--workers``, default:
 all cores). Each file is parsed once and written once per length. Files are
@@ -32,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import random
 import sys
 import tomllib
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
@@ -44,6 +57,9 @@ try:
     from tqdm import tqdm
 except ImportError:  # graceful fallback: simple counter instead of a bar
     tqdm = None
+
+DEFAULT_OUTGROUP = "OUT"  # outgroup taxon name in the CAMUS dataset
+DEFAULT_SEED = 0
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -130,6 +146,43 @@ def trim_sequences(data: PhylipFile, length: int) -> PhylipFile:
     return PhylipFile(n_taxa=data.n_taxa, n_sites=new_sites, rows=new_rows)
 
 
+def n_taxa_to_remove(n_ingroup: int, percent: float) -> int:
+    """Number of ingroup taxa to drop for a given missing percentage."""
+    return round(n_ingroup * percent / 100)
+
+
+def remove_random_taxa(data: PhylipFile, percent: float, rng: random.Random,
+                       outgroup: str | None = DEFAULT_OUTGROUP) -> PhylipFile:
+    """Return a new PhylipFile with ``percent`` % of the ingroup taxa removed.
+
+    The taxa to drop are sampled uniformly without replacement using ``rng``.
+    The outgroup is never removed and is not counted when computing how many
+    taxa to drop (e.g. 20% of 50 ingroup taxa + outgroup removes 10 taxa and
+    leaves 41 rows). Remaining rows keep their original order. Pass
+    ``outgroup=None`` to treat every taxon as removable.
+    """
+    if not 0 <= percent < 100:
+        raise ValueError(f"missing percentage must be in [0, 100): {percent}")
+    names = [name for name, _ in data.rows]
+    if outgroup is not None and outgroup not in names:
+        raise ValueError(f"outgroup {outgroup!r} not found among taxa")
+    ingroup = [name for name in names if name != outgroup]
+    dropped = set(rng.sample(ingroup, n_taxa_to_remove(len(ingroup), percent)))
+    new_rows = [row for row in data.rows if row[0] not in dropped]
+    return PhylipFile(n_taxa=len(new_rows), n_sites=data.n_sites,
+                      rows=new_rows)
+
+
+def file_rng(seed: int, rel: Path, percent: float) -> random.Random:
+    """Deterministic RNG for one (file, missing percentage) pair.
+
+    Seeding from the file's relative path (rather than sharing one RNG) makes
+    the result independent of worker count and processing order, so reruns
+    with the same seed reproduce the same dataset.
+    """
+    return random.Random(f"{seed}|{rel.as_posix()}|{percent:g}")
+
+
 # ---------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------
@@ -155,11 +208,16 @@ def find_phy_files(input_dir: Path) -> Iterable[Path]:
 
 
 def process_file(src: Path, input_dir: Path, output_dir: Path,
-                 lengths: Sequence[int]) -> list[Path]:
-    """Parse one file and write one trimmed copy per length.
+                 lengths: Sequence[int],
+                 missing: Sequence[float] = (),
+                 outgroup: str | None = DEFAULT_OUTGROUP,
+                 seed: int = DEFAULT_SEED) -> list[Path]:
+    """Parse one file and write one copy per length and per missing percentage.
 
-    The file is parsed only once regardless of how many lengths are requested.
-    Returns the list of destination paths.
+    The file is parsed only once regardless of how many variants are
+    requested. Trimmed copies (``len_<L>/``) keep every taxon; missing-taxa
+    copies (``miss_<P>/``) keep the full sequence length. Returns the list of
+    destination paths.
     """
     rel = src.relative_to(input_dir)
     data = parse_phylip(src)
@@ -168,11 +226,23 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
         dst = output_dir / f"len_{length}" / rel
         write_phylip(trim_sequences(data, length), dst)
         dsts.append(dst)
+    for percent in missing:
+        dst = output_dir / f"miss_{percent:g}" / rel
+        try:
+            reduced = remove_random_taxa(
+                data, percent, file_rng(seed, rel, percent), outgroup)
+        except ValueError as exc:
+            raise ValueError(f"{src}: {exc}") from exc
+        write_phylip(reduced, dst)
+        dsts.append(dst)
     return dsts
 
 
 def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
-        workers: int | None = None) -> None:
+        workers: int | None = None,
+        missing: Sequence[float] = (),
+        outgroup: str | None = DEFAULT_OUTGROUP,
+        seed: int = DEFAULT_SEED) -> None:
     """Stream files from ``input_dir`` and process them in parallel.
 
     Files are never all held in memory: the directory walk is consumed
@@ -193,7 +263,8 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
         workers = os.cpu_count() or 1
     workers = max(1, min(workers, total))
 
-    desc = f"trimming {total} files ({len(lengths)} lengths)"
+    desc = (f"processing {total} files ({len(lengths)} lengths, "
+            f"{len(missing)} missing levels)")
     is_tty = sys.stderr.isatty()
     pbar = (tqdm(total=total, desc=desc, unit="file")
             if tqdm is not None and is_tty else None)
@@ -223,7 +294,8 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
     try:
         if workers == 1:
             for src in find_phy_files(input_dir):
-                process_file(src, input_dir, output_dir, lengths)
+                process_file(src, input_dir, output_dir, lengths,
+                             missing, outgroup, seed)
                 advance(1)
             return
 
@@ -232,7 +304,8 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
         file_iter: Iterator[Path] = iter(find_phy_files(input_dir))
         with ProcessPoolExecutor(max_workers=workers) as pool:
             pending = {
-                pool.submit(process_file, src, input_dir, output_dir, lengths)
+                pool.submit(process_file, src, input_dir, output_dir, lengths,
+                            missing, outgroup, seed)
                 for src in islice(file_iter, max_in_flight)
             }
             while pending:
@@ -243,7 +316,7 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
                 for src in islice(file_iter, len(finished)):
                     pending.add(
                         pool.submit(process_file, src, input_dir, output_dir,
-                                    lengths))
+                                    lengths, missing, outgroup, seed))
     finally:
         if pbar is not None:
             pbar.close()
@@ -268,6 +341,13 @@ def main(argv: list[str] | None = None) -> None:
                         help="output directory (overrides config)")
     parser.add_argument("--lengths", type=int, nargs="+",
                         help="sequence lengths (overrides config)")
+    parser.add_argument("--missing", type=float, nargs="+",
+                        help="percentages of ingroup taxa to remove per file "
+                             "(overrides config)")
+    parser.add_argument("--outgroup",
+                        help="taxon that is never removed (overrides config)")
+    parser.add_argument("--seed", type=int,
+                        help="random seed for taxon removal (overrides config)")
     parser.add_argument("--workers", type=int,
                         help="parallel worker processes (default: all cores)")
     args = parser.parse_args(argv)
@@ -277,17 +357,27 @@ def main(argv: list[str] | None = None) -> None:
         input_dir = Path(cfg["input_dir"])
         output_dir = Path(cfg["output_dir"])
         lengths = [int(x) for x in cfg["lengths"]]
+        missing = [float(x) for x in cfg.get("missing_percents", [])]
+        outgroup = cfg.get("outgroup", DEFAULT_OUTGROUP)
+        seed = cfg.get("seed", DEFAULT_SEED)
         workers = cfg.get("workers")
     elif args.input and args.output and args.lengths:
         input_dir, output_dir, lengths = args.input, args.output, args.lengths
+        missing, outgroup, seed = [], DEFAULT_OUTGROUP, DEFAULT_SEED
         workers = None
     else:
         parser.error("provide either --config or all of --input/--output/--lengths")
 
+    if args.missing is not None:
+        missing = args.missing
+    if args.outgroup is not None:
+        outgroup = args.outgroup
+    if args.seed is not None:
+        seed = args.seed
     if args.workers is not None:
         workers = args.workers
 
-    run(input_dir, output_dir, lengths, workers)
+    run(input_dir, output_dir, lengths, workers, missing, outgroup, seed)
 
 
 if __name__ == "__main__":
