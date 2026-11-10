@@ -18,7 +18,7 @@
 # Sizing: 50 replicates x 1000 genes per length, three lengths in
 # data/trimmed, i.e. 150k short IQ-TREE runs; at ~5 s per gene on 32 cores
 # this fits comfortably in one day.
-#SBATCH --time=1-00:00:00
+#SBATCH --time=7-00:00:00
 #SBATCH --job-name=infer-gene-trees
 #SBATCH --partition=cs
 #SBATCH --account=cs-warnow
