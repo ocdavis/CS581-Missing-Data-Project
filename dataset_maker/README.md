@@ -13,18 +13,26 @@ length, under `output_dir/len_<L>/`.
 Handles both sequential and interleaved PHYLIP layouts. Sequences shorter
 than the target length are left unchanged (no padding).
 
-Optionally, it also produces missing-taxa variants: for each percentage `P`
-in `missing_percents`, a full-length copy of the dataset is written under
-`output_dir/miss_<P>/` in which every file has `P`% of its ingroup taxa
-removed (rows dropped, header taxon count updated). The subset is drawn
-independently for each file, the outgroup (`OUT` by default) is never removed
-and is not counted toward the percentage, and the draw is seeded per file from
-`seed` and the file's relative path, so the same seed always gives the same
-dataset regardless of worker count. With 50 ingroup taxa, 20% removes 10 taxa
-(41 rows left) and 50% removes 25 (26 rows left).
+Optionally, lengths are crossed with missing-taxa percentages: when
+`missing_percents` is given, one copy of the dataset is written for every
+(percentage `P`, length `L`) pair under `output_dir/miss_<P>/len_<L>/`, in
+which every file has `P`% of its ingroup taxa removed (rows dropped, header
+taxon count updated) and its sequences truncated to `L`. For example,
+`missing_percents = [0, 20, 50]` with `lengths = [100, 200, 500]` gives nine
+datasets, from `miss_0/len_100/` to `miss_50/len_500/`. Include `0` to get
+copies with all taxa, and the original length (500) to get untrimmed copies;
+`miss_0/len_500/` is then a copy of the input alignments, so every condition
+lives in the same directory layout.
 
-The two kinds of variant are not crossed: `len_*` copies keep every taxon and
-`miss_*` copies keep the full sequence length.
+The subset of taxa is drawn independently for each file, and the same subset
+is used at every length. The outgroup (`OUT` by default) is never removed and
+is not counted toward the percentage. The draw is seeded per file from `seed`
+and the file's relative path, so the same seed always gives the same dataset
+regardless of worker count. With 50 ingroup taxa, 20% removes 10 taxa (41
+rows left) and 50% removes 25 (26 rows left).
+
+Without `missing_percents`, the output layout is `output_dir/len_<L>/` as
+before.
 
 Files are processed in parallel with a process pool (`--workers`, default:
 all cores); each file is parsed once and written once per length. Files are
@@ -45,16 +53,13 @@ python3 dataset_maker/trim_phy.py \
     --lengths 100 250 500 \
     --workers 8
 
-# also write the missing-taxa variants
+# cross the lengths with missing-taxa percentages (miss_<P>/len_<L>/)
 python3 dataset_maker/trim_phy.py \
     --input data/camus-dataset/n50 \
     --output data/trimmed \
     --lengths 100 250 500 \
-    --missing 20 50 --outgroup OUT --seed 581
+    --missing 0 20 50 --outgroup OUT --seed 581
 ```
-
-To produce only the missing-taxa variants, use a config with `lengths = []`.
-
 ### Extending
 
 The pipeline is deliberately modular — each stage is a plain function you can
@@ -102,10 +107,8 @@ python3 dataset_maker/true_tob.py --input data/camus-dataset/n50 \
 ```
 
 The comparison is by sets of unrooted bipartitions; the exit status is
-non-zero if any replicate differs. On the 50 `n50` networks distributed with
-BROOQS-Data, the computed ToBs match their `true_tob.nwk` files in all 50
-replicates.
+non-zero if any replicate differs.
 
 `tree_of_blobs(newick) -> newick` and
 `bipartitions(newick) -> (leaves, splits)` can be imported for reuse, e.g.
-when computing FN/FP rates. No third-party packages are required.
+when computing FN/FP rates.
