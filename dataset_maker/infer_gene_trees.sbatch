@@ -37,7 +37,7 @@ PYTHON=/u/quadros3/miniconda3/envs/cs581-final-project/bin/python
 
 # First argument is the input directory (default: the trimmed datasets);
 # any further arguments are passed through to infer_gene_trees.py.
-INPUT=${1:-data/trimmed}
+INPUT=/projects/illinois/eng/cs/warnow/quadros3/classes/cs581/cs581-final-project/data/trimmed
 shift 2>/dev/null || true
 
 cd "$PROJECT"
