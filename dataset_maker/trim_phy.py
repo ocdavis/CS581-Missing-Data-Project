@@ -17,12 +17,12 @@ produced in which every file has that percentage of its ingroup taxa
 (everything except the outgroup) removed and its sequences truncated to that
 length::
 
-    output_dir / f"miss_{percent}" / f"len_{length}" / <relative path>
+    output_dir / f"miss_{percent}_len_{length}" / <relative path>
 
 An independent random subset of taxa is drawn for each file, and the same
 subset is used at every length. Include 0 in the percentages to get copies
 with all taxa, and the original sequence length in the lengths to get
-untrimmed copies; ``miss_0/len_<original length>`` is then a copy of the
+untrimmed copies; ``miss_0_len_<original length>`` is then a copy of the
 input alignments, so every condition lives in the same directory layout.
 
 Usage::
@@ -221,7 +221,7 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
     The file is parsed only once regardless of how many variants are
     requested. Without ``missing``, copies go to ``len_<L>/``. With
     ``missing``, every percentage is crossed with every length and copies go
-    to ``miss_<P>/len_<L>/``; the taxa removed for a given percentage are the
+    to ``miss_<P>_len_<L>/``; the taxa removed for a given percentage are the
     same at every length. Returns the list of destination paths.
     """
     rel = src.relative_to(input_dir)
@@ -240,7 +240,7 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
         except ValueError as exc:
             raise ValueError(f"{src}: {exc}") from exc
         for length in lengths:
-            dst = output_dir / f"miss_{percent:g}" / f"len_{length}" / rel
+            dst = output_dir / f"miss_{percent:g}_len_{length}" / rel
             write_phylip(trim_sequences(reduced, length), dst)
             dsts.append(dst)
     return dsts

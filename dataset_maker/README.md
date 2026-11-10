@@ -15,13 +15,13 @@ than the target length are left unchanged (no padding).
 
 Optionally, lengths are crossed with missing-taxa percentages: when
 `missing_percents` is given, one copy of the dataset is written for every
-(percentage `P`, length `L`) pair under `output_dir/miss_<P>/len_<L>/`, in
+(percentage `P`, length `L`) pair under `output_dir/miss_<P>_len_<L>/`, in
 which every file has `P`% of its ingroup taxa removed (rows dropped, header
 taxon count updated) and its sequences truncated to `L`. For example,
 `missing_percents = [0, 20, 50]` with `lengths = [100, 200, 500]` gives nine
-datasets, from `miss_0/len_100/` to `miss_50/len_500/`. Include `0` to get
+datasets, from `miss_0_len_100/` to `miss_50_len_500/`. Include `0` to get
 copies with all taxa, and the original length (500) to get untrimmed copies;
-`miss_0/len_500/` is then a copy of the input alignments, so every condition
+`miss_0_len_500/` is then a copy of the input alignments, so every condition
 lives in the same directory layout.
 
 The subset of taxa is drawn independently for each file, and the same subset
@@ -53,7 +53,7 @@ python3 dataset_maker/trim_phy.py \
     --lengths 100 250 500 \
     --workers 8
 
-# cross the lengths with missing-taxa percentages (miss_<P>/len_<L>/)
+# cross the lengths with missing-taxa percentages (miss_<P>_len_<L>/)
 python3 dataset_maker/trim_phy.py \
     --input data/camus-dataset/n50 \
     --output data/trimmed \
