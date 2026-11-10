@@ -1,0 +1,40 @@
+# Example config for infer_gene_trees.py
+# Paths are resolved relative to the directory the script is run from.
+#
+# Usage:
+#   python3 dataset_maker/infer_gene_trees.py --config dataset_maker/infer_gene_trees_example.toml
+
+# Directory whose subdirectories contain seqs-500 folders (required).
+# Any depth works: data/trimmed gives every replicate of every length,
+# data/trimmed/len_100 just the replicates of that length.
+input_dir = "data/trimmed"
+
+# Directory for the iqtree_500.nwk files, mirroring the input layout. Omit to
+# write each file next to its seqs-500 folder (like the CAMUS datasets).
+# output_dir = "data/gene_trees"
+
+# Directory for IQ-TREE's intermediate files (.treefile, .log, ...),
+# mirroring the input layout. Omit to use an 'iqtree-work' folder next to
+# each seqs-500 folder.
+# workdir = "data/iqtree-work"
+
+# IQ-TREE model. "MFP" selects the best-fit model on the first gene of each
+# replicate and reuses it for every other gene of that replicate; a fixed
+# model like "GTR+G" is used as-is for all genes and skips selection.
+model = "GTR+G"
+
+# Seed for reproducible IQ-TREE runs.
+seed = 581
+
+# Number of concurrent IQ-TREE processes (each runs with -T 1).
+# Omit to use all cores.
+# threads = 32
+
+# Name of the output gene-tree file.
+name = "iqtree_500.nwk"
+
+# Delete each replicate's work directory after it finishes successfully.
+clean = false
+
+# Re-run genes whose treefile already exists.
+overwrite = false

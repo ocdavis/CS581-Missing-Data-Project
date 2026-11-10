@@ -1,0 +1,13 @@
+name: cs581-final-project
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.14
+  - pandas
+  - seaborn
+  - tqdm
+  - treeswift
+  - Jinja2
+  - bioconda::iqtree

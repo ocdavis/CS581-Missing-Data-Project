@@ -112,3 +112,82 @@ non-zero if any replicate differs.
 `tree_of_blobs(newick) -> newick` and
 `bipartitions(newick) -> (leaves, splits)` can be imported for reuse, e.g.
 when computing FN/FP rates.
+
+## `infer_gene_trees.py`
+
+Infers gene trees with IQ-TREE for every replicate of a dataset directory.
+Requires the `iqtree` binary (installed via `bioconda::iqtree` in
+`environment.yml`).
+
+Every `seqs-500` folder found under the input directory (e.g.
+`data/trimmed/len_100/00/seqs-500`) is treated as one replicate: each `.phy`
+alignment inside is given to IQ-TREE and the ML trees are collected into a
+single multi-tree Newick file, one tree per line, written next to the
+`seqs-500` folder (or under `--output`, mirroring the directory layout). The
+output is named `iqtree_500.nwk` by default, matching the gene-tree files
+distributed with the CAMUS datasets, regardless of the actual alignment
+length.
+
+IQ-TREE runs one alignment at a time (`-T 1`) with `--threads` processes
+running concurrently; for the many small alignments in these datasets this
+is faster than multi-threaded runs. With `--model MFP`, the
+best-fit model is selected on the first gene of each replicate and that
+model is then reused for every other gene of the replicate; any other
+`--model` value is used as-is for all genes. `--seed` makes runs
+reproducible.
+
+A gene is only (re-)run when its `<stem>.treefile` does not exist yet, so an
+interrupted run can simply be restarted; pass `--overwrite` to redo
+everything. Intermediate IQ-TREE files (`.log`, `.iqtree`, `.ckp.gz`, ...)
+go into an `iqtree-work/` folder next to each `seqs-500` folder (or under
+`--workdir DIR`, mirroring the input layout); `--clean` deletes each
+replicate's work folder after it finishes successfully. A replicate only
+gets its output file when every alignment in it produced a tree; otherwise
+it is reported as failed and the exit status is non-zero.
+
+### Usage
+
+```bash
+# via config file
+python3 dataset_maker/infer_gene_trees.py \
+    --config dataset_maker/infer_gene_trees_example.toml
+
+# or directly
+python3 dataset_maker/infer_gene_trees.py --input data/trimmed/len_100
+
+# 16 concurrent IQ-TREE processes, fixed model, custom output location
+python3 dataset_maker/infer_gene_trees.py --input data/camus-dataset/n50 \
+    --threads 16 --model GTR+G --output data/gene_trees
+```
+
+### `infer_gene_trees.sbatch`
+
+Submits the inference as a SLURM job (32 cores, one day limit), running the
+script over the whole `data/trimmed` directory by default:
+
+```bash
+# from the repository root
+mkdir -p logs
+sbatch dataset_maker/infer_gene_trees.sbatch
+
+# different input directory, plus extra infer_gene_trees.py options
+sbatch dataset_maker/infer_gene_trees.sbatch data/camus-dataset/n50 --clean
+```
+
+The first argument is the input directory (default `data/trimmed`); further
+arguments are passed through to `infer_gene_trees.py`. Because finished
+genes are skipped, a timed-out or failed job can simply be resubmitted.
+
+### `bench_mfp.sbatch`
+
+Times a full gene-tree inference on one replicate to estimate how long the
+same calculation takes on every replicate. Replicate `00` of
+`data/trimmed/len_500` is copied to scratch and given to
+`infer_gene_trees.py` (all 1000 genes, 32 concurrent IQ-TREE processes);
+the elapsed time and the projection for all 150 replicates are printed to
+the SLURM log:
+
+```bash
+# from the repository root
+sbatch dataset_maker/bench_mfp.sbatch
+```

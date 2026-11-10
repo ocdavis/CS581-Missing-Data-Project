@@ -9,3 +9,5 @@ __pycache__/
 
 # Alpha/beta sweep version of the TOB-QMC runner (not shared yet)
 tob_qmc/sweep/
+
+.vscode
