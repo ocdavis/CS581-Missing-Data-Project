@@ -11,15 +11,19 @@ is produced per length::
 
     output_dir / f"len_{length}" / <relative path of the input file>
 
-It can also supply a list of missing-taxa percentages. For each percentage,
-one full-length copy of the dataset is produced in which every file has that
-percentage of its ingroup taxa (everything except the outgroup) removed, with
-an independent random subset drawn for each file::
+It can also supply a list of missing-taxa percentages. The two lists are then
+crossed: for every (percentage, length) pair, one copy of the dataset is
+produced in which every file has that percentage of its ingroup taxa
+(everything except the outgroup) removed and its sequences truncated to that
+length::
 
-    output_dir / f"miss_{percent}" / <relative path of the input file>
+    output_dir / f"miss_{percent}" / f"len_{length}" / <relative path>
 
-The two kinds of variant are not crossed: ``len_*`` copies keep every taxon
-and ``miss_*`` copies keep the full sequence length.
+An independent random subset of taxa is drawn for each file, and the same
+subset is used at every length. Include 0 in the percentages to get copies
+with all taxa, and the original sequence length in the lengths to get
+untrimmed copies; ``miss_0/len_<original length>`` is then a copy of the
+input alignments, so every condition lives in the same directory layout.
 
 Usage::
 
@@ -212,29 +216,33 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
                  missing: Sequence[float] = (),
                  outgroup: str | None = DEFAULT_OUTGROUP,
                  seed: int = DEFAULT_SEED) -> list[Path]:
-    """Parse one file and write one copy per length and per missing percentage.
+    """Parse one file and write one copy per (missing percentage, length).
 
     The file is parsed only once regardless of how many variants are
-    requested. Trimmed copies (``len_<L>/``) keep every taxon; missing-taxa
-    copies (``miss_<P>/``) keep the full sequence length. Returns the list of
-    destination paths.
+    requested. Without ``missing``, copies go to ``len_<L>/``. With
+    ``missing``, every percentage is crossed with every length and copies go
+    to ``miss_<P>/len_<L>/``; the taxa removed for a given percentage are the
+    same at every length. Returns the list of destination paths.
     """
     rel = src.relative_to(input_dir)
     data = parse_phylip(src)
     dsts = []
-    for length in lengths:
-        dst = output_dir / f"len_{length}" / rel
-        write_phylip(trim_sequences(data, length), dst)
-        dsts.append(dst)
+    if not missing:
+        for length in lengths:
+            dst = output_dir / f"len_{length}" / rel
+            write_phylip(trim_sequences(data, length), dst)
+            dsts.append(dst)
+        return dsts
     for percent in missing:
-        dst = output_dir / f"miss_{percent:g}" / rel
         try:
             reduced = remove_random_taxa(
                 data, percent, file_rng(seed, rel, percent), outgroup)
         except ValueError as exc:
             raise ValueError(f"{src}: {exc}") from exc
-        write_phylip(reduced, dst)
-        dsts.append(dst)
+        for length in lengths:
+            dst = output_dir / f"miss_{percent:g}" / f"len_{length}" / rel
+            write_phylip(trim_sequences(reduced, length), dst)
+            dsts.append(dst)
     return dsts
 
 
