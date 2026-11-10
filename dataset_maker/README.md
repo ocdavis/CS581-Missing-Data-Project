@@ -130,7 +130,7 @@ length.
 
 IQ-TREE runs one alignment at a time (`-T 1`) with `--threads` processes
 running concurrently; for the many small alignments in these datasets this
-is faster than multi-threaded runs. With the default `--model MFP`, the
+is faster than multi-threaded runs. With `--model MFP`, the
 best-fit model is selected on the first gene of each replicate and that
 model is then reused for every other gene of the replicate; any other
 `--model` value is used as-is for all genes. `--seed` makes runs

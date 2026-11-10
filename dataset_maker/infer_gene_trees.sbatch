@@ -2,9 +2,9 @@
 # Infer IQ-TREE gene trees for every replicate of a dataset directory.
 #
 # For each seqs-500 folder under the input directory, every .phy alignment is
-# given to IQ-TREE (-m MFP, one alignment per process, $SLURM_CPUS_PER_TASK
+# given to IQ-TREE (-m GTR+G, one alignment per process, $SLURM_CPUS_PER_TASK
 # processes running concurrently) and the ML trees are collected into a
-# g_500.nwk file next to the seqs-500 folder. Intermediates go into an
+# iqtree_500.nwk file next to the seqs-500 folder. Intermediates go into an
 # iqtree-work/ folder next to each seqs-500 folder. Finished genes are
 # skipped on rerun, so after a timeout or failure the job can simply be
 # resubmitted as-is.
