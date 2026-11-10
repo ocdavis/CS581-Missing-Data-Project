@@ -9,7 +9,7 @@
 # data/trimmed/len_100 just the replicates of that length.
 input_dir = "data/trimmed"
 
-# Directory for the g_500.nwk files, mirroring the input layout. Omit to
+# Directory for the iqtree_500.nwk files, mirroring the input layout. Omit to
 # write each file next to its seqs-500 folder (like the CAMUS datasets).
 # output_dir = "data/gene_trees"
 
@@ -18,9 +18,10 @@ input_dir = "data/trimmed"
 # each seqs-500 folder.
 # workdir = "data/iqtree-work"
 
-# IQ-TREE model. "MFP" runs model selection; a fixed model like "GTR+G"
-# skips it and is faster.
-model = "MFP"
+# IQ-TREE model. "MFP" selects the best-fit model on the first gene of each
+# replicate and reuses it for every other gene of that replicate; a fixed
+# model like "GTR+G" is used as-is for all genes and skips selection.
+model = "GTR+G"
 
 # Seed for reproducible IQ-TREE runs.
 seed = 581
@@ -30,7 +31,7 @@ seed = 581
 # threads = 32
 
 # Name of the output gene-tree file.
-name = "g_500.nwk"
+name = "iqtree_500.nwk"
 
 # Delete each replicate's work directory after it finishes successfully.
 clean = false

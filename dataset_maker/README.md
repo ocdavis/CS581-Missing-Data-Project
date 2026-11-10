@@ -124,14 +124,17 @@ Every `seqs-500` folder found under the input directory (e.g.
 alignment inside is given to IQ-TREE and the ML trees are collected into a
 single multi-tree Newick file, one tree per line, written next to the
 `seqs-500` folder (or under `--output`, mirroring the directory layout). The
-output is named `g_500.nwk` by default, matching the gene-tree files
+output is named `iqtree_500.nwk` by default, matching the gene-tree files
 distributed with the CAMUS datasets, regardless of the actual alignment
 length.
 
 IQ-TREE runs one alignment at a time (`-T 1`) with `--threads` processes
 running concurrently; for the many small alignments in these datasets this
-is faster than multi-threaded runs. Model selection uses `-m MFP` unless
-`--model` gives a fixed model, and `--seed` makes runs reproducible.
+is faster than multi-threaded runs. With the default `--model MFP`, the
+best-fit model is selected on the first gene of each replicate and that
+model is then reused for every other gene of the replicate; any other
+`--model` value is used as-is for all genes. `--seed` makes runs
+reproducible.
 
 A gene is only (re-)run when its `<stem>.treefile` does not exist yet, so an
 interrupted run can simply be restarted; pass `--overwrite` to redo
@@ -174,3 +177,17 @@ sbatch dataset_maker/infer_gene_trees.sbatch data/camus-dataset/n50 --clean
 The first argument is the input directory (default `data/trimmed`); further
 arguments are passed through to `infer_gene_trees.py`. Because finished
 genes are skipped, a timed-out or failed job can simply be resubmitted.
+
+### `bench_mfp.sbatch`
+
+Times a full gene-tree inference on one replicate to estimate how long the
+same calculation takes on every replicate. Replicate `00` of
+`data/trimmed/len_500` is copied to scratch and given to
+`infer_gene_trees.py` (all 1000 genes, 32 concurrent IQ-TREE processes);
+the elapsed time and the projection for all 150 replicates are printed to
+the SLURM log:
+
+```bash
+# from the repository root
+sbatch dataset_maker/bench_mfp.sbatch
+```

@@ -10,15 +10,17 @@ folder (or under ``--output``, mirroring the directory layout)::
     python3 infer_gene_trees.py --input data/trimmed/len_100
     python3 infer_gene_trees.py --input data/camus-dataset/n50 --threads 16
 
-The output file is named ``g_500.nwk`` by default, matching the gene-tree
+The output file is named ``iqtree_500.nwk`` by default, matching the gene-tree
 files distributed with the CAMUS datasets, regardless of the actual
 alignment length.
 
 IQ-TREE is run one alignment at a time (``-T 1``) with ``--threads``
 processes running concurrently; for the many small alignments in these
 datasets this is faster than giving IQ-TREE multiple threads per run.
-Model selection is done with ``-m MFP`` (default) unless ``--model`` gives
-a fixed model. A ``--seed`` makes runs reproducible.
+With the default ``--model MFP``, the best-fit model is selected on the
+first gene of each replicate and that model is then reused for every other
+gene of the replicate; any other ``--model`` value is used as-is for all
+genes. A ``--seed`` makes runs reproducible.
 
 Already-computed genes are skipped: a gene is only (re-)run when its
 ``<stem>.treefile`` does not exist yet, so an interrupted run can simply be
@@ -48,8 +50,8 @@ try:
 except ImportError:
     tqdm = None
 
-DEFAULT_NAME = "g_500.nwk"
-DEFAULT_MODEL = "MFP"
+DEFAULT_NAME = "iqtree_500.nwk"
+DEFAULT_MODEL = "GTR+G"
 DEFAULT_SEED = 581
 DEFAULT_WORKDIR_NAME = "iqtree-work"
 
@@ -62,6 +64,17 @@ def find_replicates(input_dir: Path) -> list[Path]:
 def treefile_for(prefix: Path) -> Path:
     """Path of the IQ-TREE ML tree for the run with prefix ``prefix``."""
     return prefix.with_suffix(".treefile")
+
+
+def best_fit_model(prefix: Path) -> str | None:
+    """Model chosen by MFP in the IQ-TREE report ``prefix.iqtree``, if any."""
+    report = prefix.with_suffix(".iqtree")
+    if not report.exists():
+        return None
+    for line in report.read_text().splitlines():
+        if "Best-fit model according to BIC" in line:
+            return line.split(":")[-1].strip()
+    return None
 
 
 def run_iqtree(phy: Path, prefix: Path, model: str, seed: int,
@@ -109,14 +122,34 @@ def process_replicate(seqs_dir: Path, out_file: Path, model: str, seed: int,
     todo = [p for p in phys if overwrite or not treefile_for(prefix_for(p)).exists()]
     failures: list[str] = []
 
+    # With MFP, select the best-fit model on the first gene only and reuse
+    # it for every other gene of the replicate; a fixed model is used as-is.
+    effective = model
+    if model.upper() == "MFP":
+        first = phys[0]
+        effective = best_fit_model(prefix_for(first))
+        if effective is None:
+            try:
+                run_iqtree(first, prefix_for(first), "MFP", seed, iqtree_bin)
+            except RuntimeError as exc:
+                failures.append(str(exc))
+            effective = best_fit_model(prefix_for(first))
+            if effective is None:
+                print(f"ERROR: could not determine best-fit model from "
+                      f"{first.name} in {seqs_dir}", file=sys.stderr)
+                return False
+        print(f"{out_file.parent.name}: best-fit model from {first.name}: "
+              f"{effective}", file=sys.stderr)
+        todo = [p for p in todo if p is not first]
+
     if todo:
         is_tty = sys.stderr.isatty()
         pbar = (tqdm(total=len(todo), desc=str(out_file.parent.name), unit="gene")
                 if tqdm is not None and is_tty else None)
         done = 0
         with ThreadPoolExecutor(max_workers=threads) as pool:
-            futures = {pool.submit(run_iqtree, p, prefix_for(p), model, seed,
-                                   iqtree_bin): p
+            futures = {pool.submit(run_iqtree, p, prefix_for(p), effective,
+                                   seed, iqtree_bin): p
                        for p in todo}
             pending = set(futures)
             while pending:
