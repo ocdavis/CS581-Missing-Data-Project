@@ -11,23 +11,20 @@ first 10 of the 1000 genes of each replicate.
 
 ```text
 example_dataset/
-├── miss_0/                  all 51 taxa
-│   ├── len_100/<rep>/seqs-500/*.phy
-│   ├── len_200/<rep>/seqs-500/*.phy
-│   └── len_500/<rep>/seqs-500/*.phy     the original alignments
-├── miss_20/                 20% of ingroup taxa removed per gene (41 taxa left)
-│   ├── len_100/ ...
-│   ├── len_200/ ...
-│   └── len_500/ ...
-├── miss_50/                 50% of ingroup taxa removed per gene (26 taxa left)
-│   ├── len_100/ ...
-│   ├── len_200/ ...
-│   └── len_500/ ...
-└── true_tob/<rep>/true_tob.nwk          true tree of blobs
+├── miss_0_len_100/<rep>/seqs-500/*.phy    all 51 taxa
+├── miss_0_len_200/ ...
+├── miss_0_len_500/ ...                    the original alignments
+├── miss_20_len_100/ ...                   20% of ingroup taxa removed per gene
+├── miss_20_len_200/ ...                   (41 taxa left)
+├── miss_20_len_500/ ...
+├── miss_50_len_100/ ...                   50% of ingroup taxa removed per gene
+├── miss_50_len_200/ ...                   (26 taxa left)
+├── miss_50_len_500/ ...
+└── true_tob/<rep>/true_tob.nwk            true tree of blobs
 ```
 
-`miss_<P>/len_<L>` holds the alignments with `P`% of the ingroup taxa removed
-and the sequences truncated to `L` sites. `miss_0/len_500` is the original
+`miss_<P>_len_<L>` holds the alignments with `P`% of the ingroup taxa removed
+and the sequences truncated to `L` sites. `miss_0_len_500` is the original
 data (same taxa and sequences as CAMUS, rewritten one taxon per line).
 
 - Taxa are removed independently for each gene, so every taxon still occurs

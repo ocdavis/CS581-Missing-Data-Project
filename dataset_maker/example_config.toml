@@ -11,12 +11,12 @@ lengths = [100, 200, 500]
 
 # --- Missing taxa (incomplete gene trees) ----------------------------------
 # Crossed with the lengths above: one output dataset is produced per
-# (percentage, length) pair, under output_dir/miss_<P>/len_<L>/
+# (percentage, length) pair, under output_dir/miss_<P>_len_<L>/
 # In every .phy file, P% of the ingroup taxa are removed (rows dropped), with
 # an independent random subset drawn for each file (the same subset at every
 # length). With 50 ingroup taxa, 20 -> 10 taxa removed (41 rows left),
 # 50 -> 25 removed (26 rows left). 0 keeps all taxa.
-# miss_0/len_500 is a copy of the original alignments.
+# miss_0_len_500 is a copy of the original alignments.
 # Omit or leave empty to get only output_dir/len_<L>/ with all taxa.
 missing_percents = [0, 20, 50]
 
