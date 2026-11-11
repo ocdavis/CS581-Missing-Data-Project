@@ -191,3 +191,25 @@ the SLURM log:
 # from the repository root
 sbatch dataset_maker/bench_mfp.sbatch
 ```
+
+### `run_subset.py` + `run_subset_00_04.sbatch` / `run_subset_05_09.sbatch`
+
+`run_subset.py` does all the work for a given replicate range: it generates
+the nine datasets with `trim_phy.py` (skipped if `data/trimmed` already
+exists, so of two simultaneously started runs only the first generates
+them), copies the range's replicates of the five datasets of interest into
+`data/subset_<range>/` — `miss_0_len_100`, `miss_0_len_200`,
+`miss_0_len_500` (0% missing at all lengths) and `miss_20_len_500`,
+`miss_50_len_500` (missing taxa, full length) — and runs
+`infer_gene_trees.py` on the subset (25 replicates x 1000 genes). The two
+sbatch scripts are thin wrappers that only set the SLURM resources (32
+cores, 128 GB):
+
+```bash
+# from the repository root; submit both at once if desired
+sbatch dataset_maker/run_subset_00_04.sbatch
+sbatch dataset_maker/run_subset_05_09.sbatch
+
+# or run a subset directly, e.g. a single replicate
+python3 dataset_maker/run_subset.py 07
+```
