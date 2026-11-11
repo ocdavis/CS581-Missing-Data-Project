@@ -1,0 +1,36 @@
+# Example config for run_ectoblob.py
+# Paths are resolved relative to the directory the script is run from.
+
+# R executable and the ectoblob.R driver script.
+rscript = "Rscript"
+# r_script = "ectoblob/ectoblob.R"  # default: next to run_ectoblob.py
+
+# Every file under input_dir matching gene_tree_glob is one ECToBlob input
+# (all gene trees of one replicate, one Newick tree per line).
+input_dir = "data/subset_00_04"
+gene_tree_glob = "iqtree_500.nwk"
+
+# A resolution of the true tree of blobs for each replicate, found by
+# start_tree_glob in the same directory as the gene trees (exactly one
+# match per replicate). Produced e.g. by TREE-QMC run without --blob.
+start_tree_glob = "tree-qmc.nwk"
+
+# The ToB for <input_dir>/<rep>/iqtree_500.nwk is written to
+# <output_dir>/<rep>/iqtree_500.ectoblob.tre (with a .ectoblob.log next to
+# it). Set output_dir equal to input_dir to write next to the gene trees.
+output_dir = "results/ectoblob"
+
+# ECToBlob parameters; see the ECToBlob vignette. A reported analysis
+# should state alpha, beta, qType, testCorrection, and the selected index.
+alpha = 0.05
+beta = 0.8
+qtype = "bi"             # "bi", "quad", or "mul"
+test_correction = "Bon"  # "Bon", "Cauchy", "BBC", or "CBC"
+index = "early"          # "early" or "late"
+
+# Taxon used to root the output tree (skipped if absent from the tree).
+outgroup = "OUT"
+
+# Save the quartet p-value table (<stem>.pTable.rds) for reuse with
+# different parameters (the quartet tallying is the slow step).
+save_table = false
