@@ -11,3 +11,13 @@ dependencies:
   - treeswift
   - Jinja2
   - bioconda::iqtree
+  # R for ectoblob/run_ectoblob.py. MSCquartets is not packaged for conda;
+  # after creating the env, install it from CRAN into the env's library:
+  #   ln -sf libxml2.so.16 $CONDA_PREFIX/lib/libxml2.so   # for r-igraph
+  #   conda run -n cs581-final-project Rscript -e \
+  #     'install.packages("MSCquartets", repos="https://cloud.r-project.org")'
+  - conda-forge::r-base
+  - conda-forge::compilers
+  - conda-forge::libxml2
+  - conda-forge::zlib
+  - conda-forge::xz
