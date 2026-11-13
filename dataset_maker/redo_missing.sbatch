@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Finish gene-tree inference for the subset replicates that are still
 # missing their iqtree_500.nwk, as a SLURM job array: one task per missing
-# replicate. dataset_maker/redo_missing.py --list finds the missing
-# replicates (the array is sized to them at submit time); each task runs
-# infer_gene_trees.py on its replicate. Finished genes are skipped, so
+# replicate. The array is sized automatically at submit time to the
+# replicates that are missing then (via redo_missing.py --list); each task
+# runs infer_gene_trees.py on its replicate. Finished genes are skipped, so
 # partial replicates are completed rather than redone, and a task whose
 # replicate was finished by another run exits immediately.
 #
@@ -19,7 +19,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=128g
-#SBATCH --array=0-39%10
+#SBATCH --array=0-0%10
 #SBATCH --output=logs/gene_trees_redo_%A_%a_log.txt
 
 set -eu
@@ -30,17 +30,31 @@ PYTHON=/u/quadros3/miniconda3/envs/cs581-final-project/bin/python
 cd "$PROJECT"
 mkdir -p logs
 
-# The missing replicates, in the same order the array indices were sized
-# against at submit time.
-MAPFILE=logs/redo_missing_${SLURM_ARRAY_JOB_ID}.txt
+# Size the array to the replicates that are missing right now: write the
+# mapfile first, then rewrite this copy of the script with the real range
+# and submit that. The submitted copy lives in logs/ and is not tracked.
+MAPFILE=logs/redo_missing_mapfile.txt
 "$PYTHON" dataset_maker/redo_missing.py --input data --list > "$MAPFILE"
 N=$(wc -l < "$MAPFILE")
-if [ "$SLURM_ARRAY_TASK_COUNT" -ne "$N" ]; then
-    echo "array has $SLURM_ARRAY_TASK_COUNT tasks but $N replicates are missing" >&2
-    echo "(resubmit to resize the array)" >&2
-    exit 1
+if [ "$N" -eq 0 ]; then
+    echo "nothing to do: every replicate has its gene trees"
+    exit 0
 fi
 
+SUBMIT=logs/redo_missing_array_${N}.sbatch
+sed "s/^#SBATCH --array=0-0%10/#SBATCH --array=0-$((N - 1))%10/" \
+    dataset_maker/redo_missing.sbatch > "$SUBMIT"
+echo "submitting array of $N task(s): $SUBMIT"
+sbatch "$SUBMIT"
+exit 0
+
+# --- the submitted array script continues below ----------------------------
+# The array size was fixed at submit time; a task whose replicate was
+# finished by another run in the meantime simply skips.
+
+# The missing replicates, in the same order the array indices were sized
+# against at submit time.
+MAPFILE=logs/redo_missing_mapfile.txt
 REP=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "$MAPFILE")
 echo "=== task $SLURM_ARRAY_TASK_ID: $REP ==="
 
