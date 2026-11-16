@@ -89,6 +89,22 @@ tree-qmc --root OUT -i <dir>/iqtree_500.nwk -o <dir>/tree-qmc.nwk --override
 and are rooted at `OUT`. Existing trees are skipped, failures are listed, and
 the exit status is non-zero unless every gene-tree file has a tree.
 
+It then adds branch lengths to each tree without changing its topology
+(`tree-qmc --supportonly tree-qmc.nwk -i iqtree_500.nwk`):
+
+| File | Contents |
+|------|----------|
+| `tree-qmc.nwk` | topology only |
+| `tree-qmc.support.nwk` | TREE-QMC's annotated tree: quartet support labels (`'[f1=...;q1=...;EN=...]'`) and branch lengths |
+| `tree-qmc.brlen.nwk` | the same tree with the labels removed, i.e. plain Newick with branch lengths |
+
+The lengths are in coalescent units, estimated from the quartet frequencies
+around each branch. Only internal branches have one; terminal branches have
+no length. A length of `0` means the gene trees do not favour that branch
+over the two alternative resolutions. Running the script again on a
+directory that already has `tree-qmc.nwk` only adds the missing
+branch-length files.
+
 ### Build
 
 Base trees do not need tree-of-blobs support, so TREE-QMC can be built
@@ -148,5 +164,5 @@ write to the same `OUT_NAME`, so keep one gene-tree file per folder.
 To collect only the base trees, keeping the layout:
 
 ```bash
-cd data && find gene_trees -name tree-qmc.nwk | sort | tar -czf ../tree_qmc_trees.tar.gz -T -
+cd data && find gene_trees -name "tree-qmc*.nwk" | sort | tar -czf ../tree_qmc_trees.tar.gz -T -
 ```
