@@ -124,11 +124,6 @@ mkdir -p logs
 sbatch tob_qmc/run_base_tree.sbatch data/gene_trees
 ```
 
-The `#SBATCH` lines use the `cs` partition and the `cs-melkebir` account;
-override them on the command line, e.g.
-`sbatch --account=cs-warnow --partition=cs,secondary --time=01:00:00 tob_qmc/run_base_tree.sbatch data/gene_trees`
-(`secondary` has a 4-hour limit, so the time must be lowered to use it).
-
 ### Other datasets
 
 The script works on any directory: it finds every gene-tree file below it,
