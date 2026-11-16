@@ -9,7 +9,10 @@ rscript = "Rscript"
 # species trees (resolutions of the true tree of blobs) next to them.
 input_dir = "data/gene_trees"
 gene_tree_glob = "iqtree_500.nwk"
-start_tree_glob = "tree-qmc.nwk"
+# TREE-QMC species trees with branch lengths; the quartet tests ignore
+# lengths, they only need to exist for ECToBlob's near-zero-branch
+# collapsing (ectoblob.R falls back to unit lengths if a tree has none).
+start_tree_glob = "tree-qmc.brlen.nwk"
 
 # The ToB for <input_dir>/<dataset>/<rep>/iqtree_500.nwk is written next to
 # it as iqtree_500.ectoblob.tre (with a .ectoblob.log next to it). Set
