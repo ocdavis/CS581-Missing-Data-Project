@@ -69,3 +69,89 @@ Files whose `.tob.tre` already exists are skipped, so the same command can be
 rerun after an interruption. Delete an output to redo it. If `tree-qmc` fails
 on a file, the script continues with the rest and reports the failures at the
 end.
+
+## Base trees (`run_base_tree.sbatch`)
+
+Estimates a TREE-QMC species tree for every gene-tree file under a
+directory. This is the base ("refinement") tree that both TOB-QMC and
+ECToBlob start from, so that the two methods contract the same tree. It is
+`ectoblob/`'s `start_tree_glob = "tree-qmc.nwk"`.
+
+For each `<dir>/iqtree_500.nwk` it runs
+
+```bash
+tree-qmc --root OUT -i <dir>/iqtree_500.nwk -o <dir>/tree-qmc.nwk --override
+```
+
+(TREE-QMC defaults: unweighted quartets, `n2` normalization) and writes
+`tree-qmc.nwk` next to the gene trees, with TREE-QMC's messages in
+`tree-qmc.log`. The trees are binary, contain every taxon of the replicate
+and are rooted at `OUT`. Existing trees are skipped, failures are listed, and
+the exit status is non-zero unless every gene-tree file has a tree.
+
+### Build
+
+Base trees do not need tree-of-blobs support, so TREE-QMC can be built
+without R. The current TREE-QMC `main` does not compile this way; commit
+`7f840e7` (version 4.1.5) does:
+
+```bash
+module load gcc/13.3.0
+git clone https://github.com/molloy-lab/TREE-QMC    # next to this repository
+cd TREE-QMC && git checkout 7f840e7
+cd external/MQLib && make
+cd ../../ && mkdir -p build && cd build
+g++ -std=c++11 -O2 -I ../external/MQLib/include -I ../external/toms743 \
+    -o tree-qmc ../src/*.cpp ../external/toms743/toms743.cpp \
+    ../external/MQLib/bin/MQLib.a -lm -DVERSION=\"$(cat ../version.txt)\"
+./tree-qmc -h | head -5
+```
+
+The script looks for `../TREE-QMC/build/tree-qmc` relative to this
+repository; set `TREE_QMC_BUILD` to a different `build` directory if needed.
+
+### Run
+
+With the gene trees laid out as `data/gene_trees/<dataset>/<rep>/iqtree_500.nwk`,
+from the repository root:
+
+```bash
+# one replicate, without SLURM (about 7 s)
+bash tob_qmc/run_base_tree.sbatch data/gene_trees/miss_50_len_500/00
+
+# everything (250 trees, a few minutes on 16 cores)
+mkdir -p logs
+sbatch tob_qmc/run_base_tree.sbatch data/gene_trees
+```
+
+The `#SBATCH` lines use the `cs` partition and the `cs-melkebir` account;
+override them on the command line, e.g.
+`sbatch --account=cs-warnow --partition=cs,secondary --time=01:00:00 tob_qmc/run_base_tree.sbatch data/gene_trees`
+(`secondary` has a 4-hour limit, so the time must be lowered to use it).
+
+### Other datasets
+
+The script works on any directory: it finds every gene-tree file below it,
+at any depth, and writes the species tree next to each one. Each gene-tree
+file must hold all gene trees of one dataset, one Newick tree per line. The
+file names and the outgroup are environment variables:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `GENES_NAME` | `iqtree_500.nwk` | name of the gene-tree files to look for (a `find -name` pattern, so `"*.tre"` also works) |
+| `OUT_NAME` | `tree-qmc.nwk` | name of the species tree written next to each one |
+| `OUTGROUP` | `OUT` | taxon to root at; set `OUTGROUP=` (empty) to leave the tree unrooted |
+
+```bash
+GENES_NAME=genes.tre OUT_NAME=species.tre OUTGROUP=Homo_sapiens \
+    sbatch tob_qmc/run_base_tree.sbatch path/to/dataset
+```
+
+With a pattern that matches several files in one folder, they would all
+write to the same `OUT_NAME`, so keep one gene-tree file per folder.
+
+To collect only the base trees, keeping the layout:
+
+```bash
+cd data && find gene_trees -name tree-qmc.nwk | sort | tar -czf ../tree_qmc_trees.tar.gz -T -
+```
