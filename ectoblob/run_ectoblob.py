@@ -29,16 +29,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", type=Path, required=True,
                         help="TOML config file (see example_config.toml)")
+    parser.add_argument("--input", type=Path,
+                        help="input directory (overrides the config; use to "
+                             "process one dataset of the input layout)")
+    parser.add_argument("--output", type=Path,
+                        help="output directory (overrides the config; pass "
+                             "the same directory as --input to write next to "
+                             "the gene trees)")
     args = parser.parse_args()
 
     with args.config.open("rb") as fh:
         cfg = tomllib.load(fh)
     rscript = cfg.get("rscript", "Rscript")
     r_script = Path(cfg.get("r_script", Path(__file__).parent / "ectoblob.R"))
-    input_dir = Path(cfg["input_dir"])
+    input_dir = Path(args.input or cfg["input_dir"]).resolve()
+    output_dir = Path(args.output or cfg.get("output_dir") or input_dir).resolve()
     gene_tree_glob = cfg["gene_tree_glob"]
     start_tree_glob = cfg["start_tree_glob"]
-    output_dir = Path(cfg["output_dir"])
     alpha = cfg.get("alpha", 0.05)
     beta = cfg.get("beta", 0.8)
     qtype = cfg.get("qtype", "bi")
@@ -53,8 +60,8 @@ def main() -> None:
 
     failed = 0
     for i, genes in enumerate(files, 1):
-        rel = genes.relative_to(input_dir)
-        out = output_dir / rel.parent / f"{rel.stem}.ectoblob.tre"
+        rel = genes.resolve().relative_to(input_dir)
+        out = output_dir / rel.with_suffix(".ectoblob.tre")
         log = out.with_suffix(".log")
         if out.exists():
             print(f"[{i}/{len(files)}] {rel}: already done, skipping")

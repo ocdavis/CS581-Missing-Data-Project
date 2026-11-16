@@ -47,6 +47,14 @@ save_table <- has_flag("--save-table")
 gts <- read.tree(genes_file)
 start_tree <- read.tree(tree_file)
 
+# ECToBlob collapses near-zero branches on the starting tree (di2multi),
+# which requires branch lengths -- but TREE-QMC species trees have none.
+# The quartet tests are topology-based (lengths are ignored), so unit
+# lengths make that step a no-op without affecting the result.
+if (is.null(start_tree$edge.length)) {
+    start_tree$edge.length <- rep(1, nrow(start_tree$edge))
+}
+
 out <- ECToBlob(gts, start_tree, alpha = alpha, beta = beta,
                 qType = qtype, testCorrection = correction, plot = 0)
 
