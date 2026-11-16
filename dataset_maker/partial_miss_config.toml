@@ -1,0 +1,65 @@
+# Config for trim_phy.py: partial missingness at full sequence length.
+#
+# Models the realistic case where only *some* gene trees suffer from missing
+# taxa: in each dataset a fixed percentage of the .phy files have taxa
+# removed, while the remaining files stay complete. Sequences are not
+# shortened, so the effect of missing taxa is isolated from gene-tree
+# estimation error.
+#
+# Produces two datasets under output_dir:
+#
+#   miss_50_files_50_len_500   50% of the genes lose 50% of their ingroup
+#                              taxa; the other 50% keep all 51 taxa
+#   miss_50_files_80_len_500   80% of the genes lose 50% of their ingroup
+#                              taxa; the other 20% keep all 51 taxa
+#
+# Every sequence is 500 sites long in both datasets, and the outgroup (OUT)
+# is never removed.
+#
+# Run with:
+#   python3 dataset_maker/trim_phy.py --config dataset_maker/partial_miss_config.toml
+# or submit it to SLURM:
+#   sbatch dataset_maker/run_partial_miss.sbatch
+#
+# Paths are resolved relative to the directory the script is run from, so run
+# from the repository root.
+
+input_dir = "data/camus-dataset/n50"
+output_dir = "data/trimmed"
+
+# --- Full length only ------------------------------------------------------
+# No shortening: a single length, equal to the original alignment length.
+lengths = [500]
+
+# --- Missing taxa ----------------------------------------------------------
+# Percentage of ingroup taxa removed from each selected gene. With 50 ingroup
+# taxa, 50 -> 25 removed, leaving 26 rows (25 ingroup + the outgroup).
+missing_percents = [50]
+
+# --- Fraction of genes affected --------------------------------------------
+# Percentage of the .phy files that get the taxa removed; the remaining files
+# keep every taxon and are only copied (at full length, so they are identical
+# to the input alignments). Crossed with missing_percents and lengths, giving
+# one dataset per value:
+#   50 -> miss_50_files_50_len_500
+#   80 -> miss_50_files_80_len_500
+# Each directory (one seqs-500 replicate) is ranked by a seeded draw from the
+# file's relative path and its lowest round(n * F / 100) files are selected,
+# so the count is exact: exactly 500 of 1000 genes per replicate at 50%, and
+# 800 of 1000 at 80%. The chosen genes are scattered across the whole file
+# list, not the first F%, and the result is identical across reruns and
+# worker counts. The ranking does not depend on the percentage, so the two
+# conditions are nested: the 500 genes reduced at 50% are also among the
+# 800 genes reduced at 80%.
+file_percents = [50, 80]
+
+# Taxon that is never removed and is not counted toward the percentages.
+outgroup = "OUT"
+
+# Same seed as the other datasets, so the taxa dropped from a given gene are
+# the same subset as in miss_50_len_500 and the other missing-taxa datasets.
+seed = 581
+
+# Parallel worker processes (optional; default = all cores). The sbatch
+# wrapper passes --workers so the count matches the SLURM allocation.
+# workers = 32

@@ -25,6 +25,28 @@ with all taxa, and the original sequence length in the lengths to get
 untrimmed copies; ``miss_0_len_<original length>`` is then a copy of the
 input alignments, so every condition lives in the same directory layout.
 
+A third list, ``file_percents``, controls how many of the files are affected.
+It is crossed with both lists, so for every (file percentage, missing
+percentage, length) triple one copy of the dataset is produced in which only
+that percentage of the files have taxa removed; the remaining files keep all
+their taxa and are merely truncated to the requested length::
+
+    output_dir / f"miss_{percent}_files_{files}_len_{length}" / <relative path>
+
+For example ``--lengths 500 --missing 50 --file-percents 50`` writes
+``miss_50_files_50_len_500``: half the alignments lose half their ingroup
+taxa, the other half stay complete, and every sequence keeps its original
+length. A file percentage of 100 reduces every file, which is the default and
+keeps the plain ``miss_<P>_len_<L>`` names used by the existing datasets.
+
+The number of files picked is exact, not sampled: the files are grouped by
+their parent directory (one group per ``seqs-500`` replicate) and, within each
+group, the ``round(n * F / 100)`` files with the lowest seeded draw are
+chosen. Every replicate is therefore affected exactly ``F`` % of the time
+whenever that lands on a whole gene, and the counts are identical whatever
+``--workers`` is. The number of taxa removed is likewise exact: ``round`` of
+``n_ingroup * P / 100``, drawn uniformly without replacement from the ingroup.
+
 Usage::
 
     python3 trim_phy.py --config example_config.toml
@@ -32,6 +54,8 @@ Usage::
         --lengths 100 250 500 --workers 8
     python3 trim_phy.py --input data/camus-dataset/n50 --output data/trimmed \
         --lengths 100 250 500 --missing 20 50 --outgroup OUT --seed 581
+    python3 trim_phy.py --input data/camus-dataset/n50 --output data/trimmed \
+        --lengths 500 --missing 50 --file-percents 50
 
 Files are processed in parallel with a process pool (``--workers``, default:
 all cores). Each file is parsed once and written once per length. Files are
@@ -55,7 +79,7 @@ from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import Iterable, Iterator, Sequence
+from typing import Iterable, Iterator, Mapping, Sequence
 
 try:
     from tqdm import tqdm
@@ -150,9 +174,18 @@ def trim_sequences(data: PhylipFile, length: int) -> PhylipFile:
     return PhylipFile(n_taxa=data.n_taxa, n_sites=new_sites, rows=new_rows)
 
 
+def _round_count(n: int, percent: float) -> int:
+    """``n`` scaled by ``percent``, rounded to the nearest whole item.
+
+    Used both for the number of taxa to drop and the number of files to
+    select, so the two behave the same way.
+    """
+    return round(n * percent / 100)
+
+
 def n_taxa_to_remove(n_ingroup: int, percent: float) -> int:
     """Number of ingroup taxa to drop for a given missing percentage."""
-    return round(n_ingroup * percent / 100)
+    return _round_count(n_ingroup, percent)
 
 
 def remove_random_taxa(data: PhylipFile, percent: float, rng: random.Random,
@@ -187,6 +220,99 @@ def file_rng(seed: int, rel: Path, percent: float) -> random.Random:
     return random.Random(f"{seed}|{rel.as_posix()}|{percent:g}")
 
 
+def file_draw(seed: int, rel: Path) -> float:
+    """Uniform draw in [0, 1) that identifies one file.
+
+    Seeded from the file's relative path with its own salt, so it is
+    independent of the taxon draw (:func:`file_rng`) and of the number of
+    workers or the processing order. The draw deliberately does not depend on
+    any percentage, which is what lets :func:`selection_cutoffs` rank files
+    and keeps the conditions nested.
+    """
+    return random.Random(f"{seed}|{rel.as_posix()}|filemiss").random()
+
+
+def selection_cutoffs(files: Iterable[Path], input_dir: Path, seed: int,
+                      file_percent: float) -> dict[Path, float]:
+    """Per-directory thresholds that select an *exact* number of files.
+
+    Files are grouped by their parent directory — one group per ``seqs-500``
+    folder in the CAMUS layout, or a single group for a flat input directory.
+    Within each group the files are ranked by :func:`file_draw` and the
+    ``round(n * file_percent / 100)`` lowest are selected, so every group
+    gets exactly the requested count whenever the percentage lands on a whole
+    file and the nearest whole number otherwise. Ranking each directory
+    separately also means every replicate of a dataset is affected equally
+    often, instead of the count fluctuating from replicate to replicate.
+
+    Returns ``{parent directory: threshold}``; a file is selected when its
+    draw is ``<=`` the threshold of its own directory. Because the ranking
+    uses the same draw at every percentage, the set selected at ``F`` is a
+    subset of the set selected at any ``F' > F``.
+    """
+    if not 0 < file_percent <= 100:
+        raise ValueError(f"file percentage must be in (0, 100]: {file_percent}")
+    groups: dict[Path, list[tuple[float, Path]]] = {}
+    for src in files:
+        rel = src.relative_to(input_dir)
+        groups.setdefault(rel.parent, []).append((file_draw(seed, rel), rel))
+    cutoffs: dict[Path, float] = {}
+    for parent, items in groups.items():
+        items.sort()
+        n_select = _round_count(len(items), file_percent)
+        if n_select <= 0:
+            cutoffs[parent] = float("-inf")     # select nothing
+        elif n_select >= len(items):
+            cutoffs[parent] = float("inf")      # select everything
+        else:
+            cutoffs[parent] = items[n_select - 1][0]
+    return cutoffs
+
+
+def file_selected(seed: int, rel: Path, file_percent: float,
+                  cutoff: float | None = None) -> bool:
+    """Deterministic decision: does ``rel`` get any taxa removed?
+
+    ``file_percent`` is the percentage of the files that should be reduced;
+    100 selects every file. With ``cutoff`` — a threshold from
+    :func:`selection_cutoffs` — the file is selected when its draw is at or
+    below it, which makes the number of selected files exact. Without a
+    cutoff the draw is compared against ``file_percent`` directly, which is
+    correct in expectation but only approximately ``file_percent`` % of the
+    files; that path exists for callers that process files one at a time and
+    cannot see the whole file set.
+
+    Either way the draw does not depend on ``file_percent``, so the
+    selections for different percentages are *nested*: every file reduced at
+    ``F`` is also reduced at any ``F' > F``, and the affected files are the
+    same at every missing percentage and length. Comparing two conditions
+    therefore isolates how many genes are affected rather than also changing
+    which genes they are. Like :func:`file_rng`, the choice is independent of
+    worker count and processing order.
+    """
+    if not 0 < file_percent <= 100:
+        raise ValueError(f"file percentage must be in (0, 100]: {file_percent}")
+    if file_percent == 100:
+        return True
+    draw = file_draw(seed, rel)
+    if cutoff is not None:
+        return draw <= cutoff
+    return draw < file_percent / 100
+
+
+def condition_dir(missing_percent: float, length: int,
+                  file_percent: float = 100) -> str:
+    """Directory name for one (file %, missing %, length) condition.
+
+    The ``files_<F>`` component is left out when every file is reduced
+    (``F == 100``) so the datasets written before this option existed keep
+    their ``miss_<P>_len_<L>`` names.
+    """
+    if file_percent >= 100:
+        return f"miss_{missing_percent:g}_len_{length}"
+    return f"miss_{missing_percent:g}_files_{file_percent:g}_len_{length}"
+
+
 # ---------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------
@@ -215,14 +341,27 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
                  lengths: Sequence[int],
                  missing: Sequence[float] = (),
                  outgroup: str | None = DEFAULT_OUTGROUP,
-                 seed: int = DEFAULT_SEED) -> list[Path]:
-    """Parse one file and write one copy per (missing percentage, length).
+                 seed: int = DEFAULT_SEED,
+                 file_percents: Sequence[float] = (),
+                 cutoffs: Mapping[float, Mapping[Path, float]] | None = None
+                 ) -> list[Path]:
+    """Parse one file and write one copy per condition.
 
     The file is parsed only once regardless of how many variants are
     requested. Without ``missing``, copies go to ``len_<L>/``. With
-    ``missing``, every percentage is crossed with every length and copies go
-    to ``miss_<P>_len_<L>/``; the taxa removed for a given percentage are the
-    same at every length. Returns the list of destination paths.
+    ``missing``, every file percentage is crossed with every missing
+    percentage and every length, and copies go to
+    ``miss_<P>_files_<F>_len_<L>/`` (plain ``miss_<P>_len_<L>/`` when ``F``
+    is 100, the default). A file percentage of ``F`` removes taxa only from
+    the files picked by :func:`file_selected`; the other files keep all their
+    taxa and are merely truncated to the requested length. The taxa removed
+    for a given percentage are the same at every length. Returns the list of
+    destination paths.
+
+    ``cutoffs`` maps a file percentage to the threshold table from
+    :func:`selection_cutoffs`. Passing it makes the number of selected files
+    exact; leaving it out falls back to the per-file comparison, which is
+    only approximately ``F`` % of the files.
     """
     rel = src.relative_to(input_dir)
     data = parse_phylip(src)
@@ -233,16 +372,26 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
             write_phylip(trim_sequences(data, length), dst)
             dsts.append(dst)
         return dsts
-    for percent in missing:
-        try:
-            reduced = remove_random_taxa(
-                data, percent, file_rng(seed, rel, percent), outgroup)
-        except ValueError as exc:
-            raise ValueError(f"{src}: {exc}") from exc
-        for length in lengths:
-            dst = output_dir / f"miss_{percent:g}_len_{length}" / rel
-            write_phylip(trim_sequences(reduced, length), dst)
-            dsts.append(dst)
+    for file_percent in (tuple(file_percents) or (100.0,)):
+        thresholds = None if cutoffs is None else cutoffs.get(file_percent)
+        selected = file_selected(
+            seed, rel, file_percent,
+            None if thresholds is None else thresholds[rel.parent])
+        for percent in missing:
+            if selected:
+                try:
+                    reduced = remove_random_taxa(
+                        data, percent, file_rng(seed, rel, percent), outgroup)
+                except ValueError as exc:
+                    raise ValueError(f"{src}: {exc}") from exc
+            else:
+                # Not chosen for reduction: keep every taxon, trim only.
+                reduced = data
+            for length in lengths:
+                dst = (output_dir
+                       / condition_dir(percent, length, file_percent) / rel)
+                write_phylip(trim_sequences(reduced, length), dst)
+                dsts.append(dst)
     return dsts
 
 
@@ -250,7 +399,8 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
         workers: int | None = None,
         missing: Sequence[float] = (),
         outgroup: str | None = DEFAULT_OUTGROUP,
-        seed: int = DEFAULT_SEED) -> None:
+        seed: int = DEFAULT_SEED,
+        file_percents: Sequence[float] = ()) -> None:
     """Stream files from ``input_dir`` and process them in parallel.
 
     Files are never all held in memory: the directory walk is consumed
@@ -262,17 +412,31 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
     a terminal, and periodic one-line-per-update progress messages when the
     output is piped or redirected (where ``\\r``-based bars cannot render).
     """
-    total = sum(1 for _ in find_phy_files(input_dir))
+    files = list(find_phy_files(input_dir))
+    total = len(files)
     if total == 0:
         print(f"warning: no .phy files found under {input_dir}", file=sys.stderr)
         return
+
+    if file_percents and not missing:
+        raise ValueError(
+            "file_percents requires missing_percents: with no taxa removed "
+            "there is nothing to restrict to a subset of the files")
+
+    # Threshold tables for the exact per-directory selection. Computed once
+    # here rather than per worker, so the selected count is exact and the same
+    # for any --workers.
+    cutoffs = {f: selection_cutoffs(files, input_dir, seed, f)
+               for f in file_percents if f < 100}
 
     if workers is None:
         workers = os.cpu_count() or 1
     workers = max(1, min(workers, total))
 
-    desc = (f"processing {total} files ({len(lengths)} lengths, "
-            f"{len(missing)} missing levels)")
+    levels = [f"{len(lengths)} lengths", f"{len(missing)} missing levels"]
+    if file_percents and any(f != 100 for f in file_percents):
+        levels.append(f"{len(file_percents)} file levels")
+    desc = f"processing {total} files ({', '.join(levels)})"
     is_tty = sys.stderr.isatty()
     pbar = (tqdm(total=total, desc=desc, unit="file")
             if tqdm is not None and is_tty else None)
@@ -301,19 +465,19 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
 
     try:
         if workers == 1:
-            for src in find_phy_files(input_dir):
+            for src in files:
                 process_file(src, input_dir, output_dir, lengths,
-                             missing, outgroup, seed)
+                             missing, outgroup, seed, file_percents, cutoffs)
                 advance(1)
             return
 
-        # Bounded window of in-flight futures; the walk is consumed lazily.
+        # Bounded window of in-flight futures over the already-listed files.
         max_in_flight = workers * 4
-        file_iter: Iterator[Path] = iter(find_phy_files(input_dir))
+        file_iter: Iterator[Path] = iter(files)
         with ProcessPoolExecutor(max_workers=workers) as pool:
             pending = {
                 pool.submit(process_file, src, input_dir, output_dir, lengths,
-                            missing, outgroup, seed)
+                            missing, outgroup, seed, file_percents, cutoffs)
                 for src in islice(file_iter, max_in_flight)
             }
             while pending:
@@ -324,7 +488,8 @@ def run(input_dir: Path, output_dir: Path, lengths: Sequence[int],
                 for src in islice(file_iter, len(finished)):
                     pending.add(
                         pool.submit(process_file, src, input_dir, output_dir,
-                                    lengths, missing, outgroup, seed))
+                                    lengths, missing, outgroup, seed,
+                                    file_percents, cutoffs))
     finally:
         if pbar is not None:
             pbar.close()
@@ -352,6 +517,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--missing", type=float, nargs="+",
                         help="percentages of ingroup taxa to remove per file "
                              "(overrides config)")
+    parser.add_argument("--file-percents", type=float, nargs="+",
+                        help="percentages of .phy files that get taxa removed; "
+                             "crossed with --missing and --lengths "
+                             "(overrides config)")
     parser.add_argument("--outgroup",
                         help="taxon that is never removed (overrides config)")
     parser.add_argument("--seed", type=int,
@@ -366,18 +535,22 @@ def main(argv: list[str] | None = None) -> None:
         output_dir = Path(cfg["output_dir"])
         lengths = [int(x) for x in cfg["lengths"]]
         missing = [float(x) for x in cfg.get("missing_percents", [])]
+        file_percents = [float(x) for x in cfg.get("file_percents", [])]
         outgroup = cfg.get("outgroup", DEFAULT_OUTGROUP)
         seed = cfg.get("seed", DEFAULT_SEED)
         workers = cfg.get("workers")
     elif args.input and args.output and args.lengths:
         input_dir, output_dir, lengths = args.input, args.output, args.lengths
-        missing, outgroup, seed = [], DEFAULT_OUTGROUP, DEFAULT_SEED
+        missing, file_percents = [], []
+        outgroup, seed = DEFAULT_OUTGROUP, DEFAULT_SEED
         workers = None
     else:
         parser.error("provide either --config or all of --input/--output/--lengths")
 
     if args.missing is not None:
         missing = args.missing
+    if args.file_percents is not None:
+        file_percents = args.file_percents
     if args.outgroup is not None:
         outgroup = args.outgroup
     if args.seed is not None:
@@ -385,7 +558,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.workers is not None:
         workers = args.workers
 
-    run(input_dir, output_dir, lengths, workers, missing, outgroup, seed)
+    run(input_dir, output_dir, lengths, workers, missing, outgroup, seed,
+        file_percents)
 
 
 if __name__ == "__main__":

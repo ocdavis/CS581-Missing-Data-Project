@@ -31,6 +31,38 @@ and the file's relative path, so the same seed always gives the same dataset
 regardless of worker count. With 50 ingroup taxa, 20% removes 10 taxa (41
 rows left) and 50% removes 25 (26 rows left).
 
+A third list, `file_percents`, controls how many of the files are affected.
+It is crossed with `missing_percents` and `lengths`, so each (file percentage
+`F`, missing percentage `P`, length `L`) triple becomes
+`output_dir/miss_<P>_files_<F>_len_<L>/`, in which only `F`% of the `.phy`
+files have `P`% of their taxa removed; the remaining files keep all their
+taxa and are merely truncated to `L`. For example
+
+```bash
+python3 dataset_maker/trim_phy.py --input data/camus-dataset/n50 \
+    --output data/trimmed --lengths 500 --missing 50 --file-percents 50
+```
+
+writes `miss_50_files_50_len_500/`: half the genes lose half their taxa, the
+other half stay complete, and every sequence keeps its original length. This
+models the realistic case where only some gene trees suffer from missing
+taxa. A file percentage of `100` reduces every file, which is the default
+when `file_percents` is absent and keeps the plain `miss_<P>_len_<L>/` names
+used by the existing datasets. `file_percents` requires `missing_percents`.
+
+The number of files picked is exact rather than sampled. Files are grouped by
+their parent directory (one group per `seqs-500` replicate) and, within each
+group, ranked by a seeded draw derived from the file's relative path; the
+`round(n * F / 100)` lowest are selected. So every replicate is affected
+exactly `F` % of the time whenever that lands on a whole gene — 50% of 1000
+genes is 500 genes in *every* replicate — and the counts are identical for
+any `--workers`. The selection is a random subset scattered across the whole
+file list, not the first `F` % in name or walk order. The draw does not
+depend on `F`, so the conditions are nested: every file reduced at `F` is
+also reduced at any larger `F`, and the same files are affected at every `P`
+and `L`. Which genes were reduced can be read back from each file's header
+taxon count.
+
 Without `missing_percents`, the output layout is `output_dir/len_<L>/` as
 before.
 
@@ -59,7 +91,16 @@ python3 dataset_maker/trim_phy.py \
     --output data/trimmed \
     --lengths 100 250 500 \
     --missing 0 20 50 --outgroup OUT --seed 581
+
+# remove taxa from only a fraction of the genes
+# (miss_<P>_files_<F>_len_<L>/)
+python3 dataset_maker/trim_phy.py \
+    --input data/camus-dataset/n50 \
+    --output data/trimmed \
+    --lengths 500 \
+    --missing 50 --file-percents 50 80 --seed 581
 ```
+
 ### Extending
 
 The pipeline is deliberately modular — each stage is a plain function you can
@@ -70,13 +111,80 @@ import and reuse or replace:
 | parse          | `parse_phylip(path) -> PhylipFile` |
 | transform      | `trim_sequences(data, length) -> PhylipFile` |
 | transform      | `remove_random_taxa(data, percent, rng, outgroup) -> PhylipFile` |
+| select         | `file_selected(seed, rel, file_percent) -> bool` |
 | write          | `write_phylip(data, path)`         |
-| per-file driver| `process_file(src, input_dir, output_dir, lengths, missing, outgroup, seed)` |
-| whole-run driver| `run(input_dir, output_dir, lengths, workers, missing, outgroup, seed)` |
+| naming         | `condition_dir(missing_percent, length, file_percent) -> str` |
+| per-file driver| `process_file(src, input_dir, output_dir, lengths, missing, outgroup, seed, file_percents)` |
+| whole-run driver| `run(input_dir, output_dir, lengths, workers, missing, outgroup, seed, file_percents)` |
 
 `PhylipFile` is a small dataclass holding `n_taxa`, `n_sites`, and
 `rows: list[tuple[name, sequence]]` — add fields or new transform functions
 alongside `trim_sequences` to add your own improvements.
+
+### `partial_miss_config.toml` + `run_partial_miss.sbatch`
+
+Generates the two partial-missingness datasets at full sequence length, i.e.
+the case where only some gene trees suffer from missing taxa:
+
+| Dataset | Genes with 50% of taxa dropped | Genes complete |
+|---|---|---|
+| `miss_50_files_50_len_500` | 50% | 50% |
+| `miss_50_files_80_len_500` | 80% | 20% |
+
+Every sequence stays 500 sites long and the outgroup is never removed, so the
+effect of missing taxa is isolated from gene-tree estimation error. The
+conditions are nested (the genes reduced at 50% are a subset of those reduced
+at 80%), and the taxa dropped from a given gene are the same subset as in
+`miss_50_len_500`. Existing datasets under `data/trimmed` are untouched:
+only the two new condition folders are written.
+
+```bash
+# from the repository root
+mkdir -p logs
+sbatch dataset_maker/run_partial_miss.sbatch
+
+# or run it in the foreground
+python3 dataset_maker/trim_phy.py \
+    --config dataset_maker/partial_miss_config.toml --workers 8
+```
+
+The sbatch wrapper only sets the SLURM resources (8 cores, 16 GB, 4 h — this
+step is pure file I/O) and passes `--workers` from `$SLURM_CPUS_PER_TASK`.
+
+### `run_partial_miss_trees.sh`
+
+Infers the gene trees for the two partial-missingness datasets by queueing
+**one job per replicate** (100 jobs: 2 datasets x 50 replicates) with
+`gene_trees_one.sbatch`, instead of running a whole dataset inside a single
+job. Run it on the login node, not via `sbatch`:
+
+```bash
+# from the repository root; all 100 jobs are queued at once
+bash dataset_maker/run_partial_miss_trees.sh
+
+# just one of the two datasets
+bash dataset_maker/run_partial_miss_trees.sh miss_50_files_50_len_500
+```
+
+Each job writes straight to the same layout as the other datasets:
+
+```
+data/gene_trees/miss_50_files_50_len_500/{00..49}/iqtree_500.nwk
+data/gene_trees/miss_50_files_80_len_500/{00..49}/iqtree_500.nwk
+```
+
+One ML tree per line, in gene order, for the 1000 genes of that replicate,
+produced with the same settings as the existing gene trees (model `GTR+G`,
+seed 581, 32 concurrent IQ-TREE processes per replicate). A replicate takes
+about 5-12 minutes.
+
+The launcher skips replicates whose `iqtree_500.nwk` already exists, so an
+interrupted batch can simply be relaunched and it will also retry any
+replicate whose job failed. Passing a second argument to
+`gene_trees_one.sbatch` is what redirects the output and enables `--clean`,
+which removes the `iqtree-work` folder afterwards so `data/trimmed` stays
+free of intermediates; the script also prepends the conda environment's `bin`
+to `PATH` so `iqtree` is found without activating the environment first.
 
 ## `true_tob.py`
 
