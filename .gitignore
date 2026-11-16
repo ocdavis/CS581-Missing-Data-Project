@@ -12,3 +12,6 @@ tob_qmc/sweep/
 
 .vscode
 logs
+
+# Data archives exchanged between us (gene trees, base trees, ToBs)
+*.gz

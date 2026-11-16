@@ -1,74 +1,20 @@
 # tob_qmc
 
-Runs TOB-QMC (the `--blob` mode of
-[TREE-QMC](https://github.com/molloy-lab/TREE-QMC)) on every gene-tree file
-in a directory, with TOB-QMC's default alpha (1e-7) and beta (0.95) and the
-exhaustive p-value search.
+Estimates trees of blobs with TOB-QMC (the tree-of-blobs mode of
+[TREE-QMC](https://github.com/molloy-lab/TREE-QMC)) in two stages, each a
+SLURM script that also runs with plain `bash`:
 
-## 1. Build tree-qmc
+1. `run_base_tree.sbatch` estimates a TREE-QMC species tree from each
+   gene-tree file. This base tree is the shared starting point of TOB-QMC
+   and ECToBlob.
+2. `run_tob_qmc.sbatch` tests every branch of the base tree for
+   network-like signal and contracts the branches that fail, giving the
+   tree of blobs.
 
-TOB-QMC needs a `tree-qmc` binary built **with tree-of-blobs support**. This
-is a Linux build (use the cluster, or WSL on Windows). It needs git, cmake
-3.18+, a C++ compiler and R.
-
-Install the R packages (takes a while):
-
-```bash
-Rscript -e "install.packages(c('Rcpp','RInside','MSCquartets'), repos='https://cloud.r-project.org/')"
-```
-
-Build:
-
-```bash
-git clone https://github.com/molloy-lab/TREE-QMC.git
-cd TREE-QMC
-mkdir -p build && cd build
-cmake ..
-cmake --build . -j
-```
-
-The binary is `TREE-QMC/build/tree-qmc`. Either add that `build` directory to
-your `PATH`, or put the full path in `tree_qmc` in the config. More detail is
-in the
-[TREE-QMC tree-of-blobs tutorial](https://github.com/molloy-lab/TREE-QMC/blob/main/tutorial/tree-of-blobs/README.md).
-
-## 2. Edit the config
-
-Copy `example_config.toml` and set:
-
-- `input_dir` and `gene_tree_glob`: where the gene-tree files are. Each
-  matching file is one input (all gene trees of one replicate, one Newick
-  tree per line). The example points at the true gene trees in the CAMUS
-  dataset (`data/camus-dataset/n50/*/g_true.nwk`).
-- `output_dir`: where the estimated ToBs go.
-
-## 3. Run
-
-From the repository root (needs Python 3.11+, no packages):
-
-```bash
-python3 tob_qmc/run_tob_qmc.py --config tob_qmc/example_config.toml
-```
-
-For each gene-tree file `<input_dir>/<rep>/<name>.nwk` this runs
-
-```bash
-tree-qmc --blob --alpha 1e-07 --beta 0.95 --root OUT \
-    -i <input_dir>/<rep>/<name>.nwk \
-    -o <output_dir>/<rep>/<name>.tob.tre --override --iter_limit_blob 0
-```
-
-and writes:
-
-| File | Contents |
-|------|----------|
-| `<output_dir>/<rep>/<name>.tob.tre` | estimated tree of blobs |
-| `<output_dir>/<rep>/<name>.tob.log` | tree-qmc's messages for that run |
-
-Files whose `.tob.tre` already exists are skipped, so the same command can be
-rerun after an interruption. Delete an output to redo it. If `tree-qmc` fails
-on a file, the script continues with the rest and reports the failures at the
-end.
+Both work on a directory laid out as `<dir>/.../<rep>/iqtree_500.nwk` (all
+gene trees of one replicate, one Newick tree per line) and write their
+results next to the gene trees. FN/FP against the true trees of blobs are
+computed with `../evaluation/compare_tob.py`.
 
 ## Base trees (`run_base_tree.sbatch`)
 
@@ -165,4 +111,105 @@ To collect only the base trees, keeping the layout:
 
 ```bash
 cd data && find gene_trees -name "tree-qmc*.nwk" | sort | tar -czf ../tree_qmc_trees.tar.gz -T -
+```
+
+## Trees of blobs (`run_tob_qmc.sbatch`)
+
+For each folder holding `iqtree_500.nwk` and its base tree `tree-qmc.nwk`:
+
+```bash
+# 1. search for the minimum p-value around every branch of the base tree
+tree-qmc --blobsearchonly tree-qmc.nwk --store_pvalue --iter_limit_blob 0 \
+    -i iqtree_500.nwk -o tob-qmc.pvalues.nwk
+
+# 2. contract branches at the chosen significance levels
+tree-qmc --alpha 1e-7 --beta 0.95 --load_pvalue \
+    -i tob-qmc.pvalues.nwk -o tob-qmc.nwk
+```
+
+| File | Contents |
+|------|----------|
+| `tob-qmc.nwk` | estimated tree of blobs (blobs are polytomies) |
+| `tob-qmc.pvalues.nwk` | base tree with, on every branch, the tree-test p-value (`qtt_p`), star-test p-value (`qst_p`), quartet counts and the four taxa giving the minimum |
+| `tob-qmc.search.log`, `tob-qmc.contract.log` | tree-qmc's messages for the two steps |
+
+`--iter_limit_blob 0` is the exhaustive search (every 4-taxon set across a
+branch); alpha and beta are TOB-QMC's defaults. This is the three-step form
+of `tree-qmc --blob` from the TREE-QMC tutorial, with the base tree taken
+from `run_base_tree.sbatch` instead of being re-estimated.
+
+Finished steps are skipped, so an interrupted job can simply be
+resubmitted, and failures are listed without stopping the rest. The search
+is the slow step: about 9 minutes per replicate for 51 taxa and 1000 gene
+trees, so roughly 1 to 1.5 hours for 250 replicates on 32 cores.
+
+### Build
+
+This stage needs TREE-QMC built **with** tree-of-blobs support, which
+requires cmake 3.18+, a C++20 compiler and R with Rcpp, RInside and
+MSCquartets. On the campus cluster the system gcc, cmake and R are enough;
+do this with no modules loaded (`module purge`), so that R, the R packages
+and tree-qmc all use the same compiler.
+
+```bash
+# R packages, into R's personal library (slow: 20-40 minutes)
+Rscript -e "lib <- Sys.getenv('R_LIBS_USER'); dir.create(lib, recursive=TRUE, showWarnings=FALSE); install.packages(c('Rcpp','RInside','MSCquartets'), lib=lib, repos='https://cloud.r-project.org/')"
+Rscript --vanilla -e "for (p in c('Rcpp','RInside','MSCquartets')) cat(p, requireNamespace(p, quietly=TRUE), '\n')"
+
+# TREE-QMC, in its own folder next to this repository
+git clone https://github.com/molloy-lab/TREE-QMC TREE-QMC-tob
+cd TREE-QMC-tob && git checkout 53b15e5
+mkdir -p build && cd build
+cmake .. && cmake --build . -j 4
+./tree-qmc -h | head -5
+```
+
+Commit `53b15e5` (22 Sep 2026, version 4.1.5) is the one used for this
+project. The script looks for `../TREE-QMC-tob/build/tree-qmc` relative to
+this repository; set `TREE_QMC_BUILD` to another `build` directory if
+needed. The R library must not be set through `~/.Renviron`, which the
+build ignores.
+
+### Run
+
+From the repository root, with no modules loaded:
+
+```bash
+# one replicate, without SLURM (about 9 minutes)
+bash tob_qmc/run_tob_qmc.sbatch data/gene_trees/miss_0_len_500/00
+
+# everything
+mkdir -p logs
+sbatch --partition=cs,secondary --time=04:00:00 tob_qmc/run_tob_qmc.sbatch data/gene_trees
+```
+
+As with the base trees, the `#SBATCH` lines use the `cs-melkebir` account;
+pass `--account=NAME` before the script name to change it.
+
+### Settings
+
+Environment variables, set before `sbatch` or `bash`:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `ALPHA` | `1e-7` | significance level of the tree test |
+| `BETA` | `0.95` | significance level of the star test |
+| `SEARCH` | `--iter_limit_blob 0` | search options; `SEARCH=` (empty) for TOB-QMC's default heuristic, `SEARCH=--3f1a` for 3-fix-1-alter |
+| `GENES_NAME` | `iqtree_500.nwk` | gene-tree file name |
+| `BASE_NAME` | `tree-qmc.nwk` | base tree file name |
+| `PVAL_NAME` | `tob-qmc.pvalues.nwk` | p-value tree file name |
+| `TOB_NAME` | `tob-qmc.nwk` | tree of blobs file name |
+
+Because the p-values are kept, other alpha/beta values only need the
+contraction step, which takes seconds. Give the result a different name so
+the default one is kept:
+
+```bash
+ALPHA=1e-6 TOB_NAME=tob-qmc.a1e-6.nwk bash tob_qmc/run_tob_qmc.sbatch data/gene_trees
+```
+
+To collect the results, keeping the layout:
+
+```bash
+cd data && find gene_trees -name "tob-qmc*.nwk" | sort | tar -czf ../tob_qmc_trees.tar.gz -T -
 ```
