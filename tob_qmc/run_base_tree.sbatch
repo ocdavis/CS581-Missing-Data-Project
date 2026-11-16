@@ -20,6 +20,10 @@
 #       tob_qmc/run_base_tree.sbatch data/gene_trees
 # or run without SLURM on a small directory:
 #   bash tob_qmc/run_base_tree.sbatch data/gene_trees/miss_0_len_500/00
+# For another dataset, give its directory and, if they differ, the gene-tree
+# file name, output name and outgroup:
+#   GENES_NAME=genes.tre OUT_NAME=species.tre OUTGROUP=Homo_sapiens \
+#       sbatch tob_qmc/run_base_tree.sbatch path/to/dataset
 #SBATCH --time=1-00:00:00
 #SBATCH --job-name=base-trees
 #SBATCH --partition=cs
@@ -31,7 +35,11 @@
 #SBATCH --output=logs/base_trees_%j_log.txt
 
 INPUT=${1:-data/gene_trees}
-export GENES_NAME=iqtree_500.nwk OUT_NAME=tree-qmc.nwk OUTGROUP=OUT
+# Defaults; set these environment variables before submitting to change them
+# (OUTGROUP= with no value leaves the tree unrooted).
+export GENES_NAME=${GENES_NAME:-iqtree_500.nwk}
+export OUT_NAME=${OUT_NAME:-tree-qmc.nwk}
+export OUTGROUP=${OUTGROUP-OUT}
 
 module load gcc/13.3.0
 
@@ -45,7 +53,7 @@ run_one() {
     out=$(dirname "$genes")/$OUT_NAME
     if [ -s "$out" ]; then
         echo "skip   $out"
-    elif tree-qmc --root "$OUTGROUP" -i "$genes" -o "$out" --override \
+    elif tree-qmc ${OUTGROUP:+--root "$OUTGROUP"} -i "$genes" -o "$out" --override \
             > "${out%.nwk}.log" 2>&1 && [ -s "$out" ]; then
         echo "wrote  $out"
     else

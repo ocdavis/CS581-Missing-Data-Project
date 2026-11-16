@@ -129,6 +129,27 @@ override them on the command line, e.g.
 `sbatch --account=cs-warnow --partition=cs,secondary --time=01:00:00 tob_qmc/run_base_tree.sbatch data/gene_trees`
 (`secondary` has a 4-hour limit, so the time must be lowered to use it).
 
+### Other datasets
+
+The script works on any directory: it finds every gene-tree file below it,
+at any depth, and writes the species tree next to each one. Each gene-tree
+file must hold all gene trees of one dataset, one Newick tree per line. The
+file names and the outgroup are environment variables:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `GENES_NAME` | `iqtree_500.nwk` | name of the gene-tree files to look for (a `find -name` pattern, so `"*.tre"` also works) |
+| `OUT_NAME` | `tree-qmc.nwk` | name of the species tree written next to each one |
+| `OUTGROUP` | `OUT` | taxon to root at; set `OUTGROUP=` (empty) to leave the tree unrooted |
+
+```bash
+GENES_NAME=genes.tre OUT_NAME=species.tre OUTGROUP=Homo_sapiens \
+    sbatch tob_qmc/run_base_tree.sbatch path/to/dataset
+```
+
+With a pattern that matches several files in one folder, they would all
+write to the same `OUT_NAME`, so keep one gene-tree file per folder.
+
 To collect only the base trees, keeping the layout:
 
 ```bash
