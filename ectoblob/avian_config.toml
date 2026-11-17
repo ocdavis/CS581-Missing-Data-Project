@@ -1,0 +1,47 @@
+# Config for run_ectoblob.py on the avian dataset.
+# Paths are resolved relative to the directory the script is run from, so run
+# from the repository root.
+#
+# Unlike the CAMUS datasets there is a single sample here: one file holding
+# every bootstrap tree, and one ASTRAL species tree used as the starting tree.
+# Both live directly in data/avian, so no replicate subdirectories are
+# involved and one job does the whole thing:
+#
+#   sbatch ectoblob/ectoblob_one.sbatch data/avian ectoblob/avian_config.toml
+#
+# The ToB is written next to the inputs as
+# data/avian/avian14k_bs.ectoblob.tre (with avian14k_bs.ectoblob.log beside
+# it, holding R's messages).
+
+# R executable and the ectoblob.R driver script.
+rscript = "Rscript"
+# r_script = "ectoblob/ectoblob.R"  # default: next to run_ectoblob.py
+
+# The bootstrap trees, one Newick tree per line (14446 trees).
+input_dir = "data/avian"
+gene_tree_glob = "avian14k_bs.tre"
+
+# The ASTRAL species tree, used as the resolution of the true tree of blobs.
+# It carries no branch lengths; ectoblob.R substitutes unit lengths, which is
+# what we want since the quartet tests are topology-based and ECToBlob's
+# near-zero-branch collapsing then becomes a no-op.
+start_tree_glob = "astral-rooted.nwk"
+
+# ECToBlob parameters; kept identical to ectoblob_config.toml so the avian
+# result is comparable with the CAMUS runs.
+alpha = 0.05
+beta = 0.8
+qtype = "mul"             # "bi", "quad", or "mul"
+test_correction = "Bon"  # "Bon", "Cauchy", "BBC", or "CBC"
+index = "early"          # "early" or "late"
+
+# No outgroup: the ASTRAL tree is rooted with OUT, but the bootstrap trees
+# contain only the 48 bird taxa (and not OUT), so there is nothing to root
+# the output on. The 47 taxa shared by the gene trees and the starting tree
+# are what ECToBlob uses. An empty value means --outgroup is not passed and
+# the output tree is left as ECToBlob returns it.
+outgroup = ""
+
+# Save the quartet p-value table (<stem>.pTable.rds) for reuse with
+# different parameters (the quartet tallying is the slow step).
+save_table = false
