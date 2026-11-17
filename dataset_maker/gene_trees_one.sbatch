@@ -11,8 +11,8 @@
 # Usage (from the repository root):
 #   sbatch dataset_maker/gene_trees_one.sbatch data/subset_20_24/miss_0_len_500/24
 #   sbatch dataset_maker/gene_trees_one.sbatch \
-#       data/trimmed/miss_50_files_50_len_500/00 \
-#       data/gene_trees/miss_50_files_50_len_500/00
+#       data/trimmed/miss_50_len_500_files_50/00 \
+#       data/gene_trees/miss_50_len_500_files_50/00
 #SBATCH --time=20:00
 #SBATCH --job-name=gene-trees-one
 #SBATCH --partition=scavenger

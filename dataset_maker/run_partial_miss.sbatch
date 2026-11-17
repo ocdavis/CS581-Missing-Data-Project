@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Generate the two partial-missingness datasets at full sequence length:
 #
-#   data/trimmed/miss_50_files_50_len_500   50% of the genes lose 50% of
+#   data/trimmed/miss_50_len_500_files_50   50% of the genes lose 50% of
 #                                           their ingroup taxa, the rest
 #                                           keep all taxa
-#   data/trimmed/miss_50_files_80_len_500   80% of the genes lose 50% of
+#   data/trimmed/miss_50_len_500_files_80   80% of the genes lose 50% of
 #                                           their ingroup taxa, the rest
 #                                           keep all taxa
 #
@@ -17,7 +17,7 @@
 # it needs far fewer resources than the gene-tree jobs. To infer gene trees
 # afterwards, run e.g.
 #   sbatch dataset_maker/infer_gene_trees.sbatch \
-#       data/trimmed/miss_50_files_50_len_500
+#       data/trimmed/miss_50_len_500_files_50
 #
 # Submit from the repository root:
 #   sbatch dataset_maker/run_partial_miss.sbatch
@@ -47,4 +47,4 @@ mkdir -p logs
 
 # Informational only: trim_phy already failed above if anything went wrong.
 echo "=== datasets written under data/trimmed ==="
-ls -d data/trimmed/miss_50_files_*_len_500 2>/dev/null || true
+ls -d data/trimmed/miss_50_len_500_files_* 2>/dev/null || true
