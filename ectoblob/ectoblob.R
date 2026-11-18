@@ -47,6 +47,26 @@ save_table <- has_flag("--save-table")
 gts <- read.tree(genes_file)
 start_tree <- read.tree(tree_file)
 
+# MSCquartets takes the taxon set from the FIRST gene tree and ECToBlob then
+# requires it to match the starting tree, so a gene tree that is missing taxa
+# cannot come first. In the partial-missingness datasets most gene trees have
+# taxa dropped, so whichever tree happens to be first usually disagrees with
+# the species tree and the run fails. Move the first gene tree that contains
+# every taxon seen anywhere in the collection to the front. Only the taxon set
+# is taken from that tree -- the quartet table aggregates over all of them --
+# so the order of the remaining trees is irrelevant to the result.
+all_taxa <- unique(unlist(lapply(gts, function(t) t$tip.label)))
+is_complete <- vapply(gts, function(t) all(all_taxa %in% t$tip.label),
+                      logical(1))
+first_complete <- match(TRUE, is_complete)
+if (!is.na(first_complete) && first_complete > 1L) {
+    gts <- gts[c(first_complete, setdiff(seq_along(gts), first_complete))]
+}
+message(sprintf(
+    "gene trees: %d total, %d complete; first tree has %d of %d taxa",
+    length(gts), sum(is_complete), length(gts[[1]]$tip.label),
+    length(all_taxa)))
+
 # ECToBlob collapses near-zero branches on the starting tree (di2multi)
 # and checks for negative lengths, both of which require branch lengths to
 # exist and be non-NA -- but TREE-QMC species trees have missing lengths

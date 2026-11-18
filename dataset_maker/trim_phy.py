@@ -31,10 +31,10 @@ percentage, length) triple one copy of the dataset is produced in which only
 that percentage of the files have taxa removed; the remaining files keep all
 their taxa and are merely truncated to the requested length::
 
-    output_dir / f"miss_{percent}_files_{files}_len_{length}" / <relative path>
+    output_dir / f"miss_{percent}_len_{length}_files_{files}" / <relative path>
 
 For example ``--lengths 500 --missing 50 --file-percents 50`` writes
-``miss_50_files_50_len_500``: half the alignments lose half their ingroup
+``miss_50_len_500_files_50``: half the alignments lose half their ingroup
 taxa, the other half stay complete, and every sequence keeps its original
 length. A file percentage of 100 reduces every file, which is the default and
 keeps the plain ``miss_<P>_len_<L>`` names used by the existing datasets.
@@ -304,13 +304,13 @@ def condition_dir(missing_percent: float, length: int,
                   file_percent: float = 100) -> str:
     """Directory name for one (file %, missing %, length) condition.
 
-    The ``files_<F>`` component is left out when every file is reduced
+    The ``_files_<F>`` suffix is left out when every file is reduced
     (``F == 100``) so the datasets written before this option existed keep
     their ``miss_<P>_len_<L>`` names.
     """
     if file_percent >= 100:
         return f"miss_{missing_percent:g}_len_{length}"
-    return f"miss_{missing_percent:g}_files_{file_percent:g}_len_{length}"
+    return f"miss_{missing_percent:g}_len_{length}_files_{file_percent:g}"
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
     requested. Without ``missing``, copies go to ``len_<L>/``. With
     ``missing``, every file percentage is crossed with every missing
     percentage and every length, and copies go to
-    ``miss_<P>_files_<F>_len_<L>/`` (plain ``miss_<P>_len_<L>/`` when ``F``
+    ``miss_<P>_len_<L>_files_<F>/`` (plain ``miss_<P>_len_<L>/`` when ``F``
     is 100, the default). A file percentage of ``F`` removes taxa only from
     the files picked by :func:`file_selected`; the other files keep all their
     taxa and are merely truncated to the requested length. The taxa removed

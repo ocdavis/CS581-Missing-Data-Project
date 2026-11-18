@@ -8,9 +8,9 @@
 #
 # Produces two datasets under output_dir:
 #
-#   miss_50_files_50_len_500   50% of the genes lose 50% of their ingroup
+#   miss_50_len_500_files_50   50% of the genes lose 50% of their ingroup
 #                              taxa; the other 50% keep all 51 taxa
-#   miss_50_files_80_len_500   80% of the genes lose 50% of their ingroup
+#   miss_50_len_500_files_80   80% of the genes lose 50% of their ingroup
 #                              taxa; the other 20% keep all 51 taxa
 #
 # Every sequence is 500 sites long in both datasets, and the outgroup (OUT)
@@ -41,8 +41,8 @@ missing_percents = [50]
 # keep every taxon and are only copied (at full length, so they are identical
 # to the input alignments). Crossed with missing_percents and lengths, giving
 # one dataset per value:
-#   50 -> miss_50_files_50_len_500
-#   80 -> miss_50_files_80_len_500
+#   50 -> miss_50_len_500_files_50
+#   80 -> miss_50_len_500_files_80
 # Each directory (one seqs-500 replicate) is ranked by a seeded draw from the
 # file's relative path and its lowest round(n * F / 100) files are selected,
 # so the count is exact: exactly 500 of 1000 genes per replicate at 50%, and

@@ -34,7 +34,7 @@ rows left) and 50% removes 25 (26 rows left).
 A third list, `file_percents`, controls how many of the files are affected.
 It is crossed with `missing_percents` and `lengths`, so each (file percentage
 `F`, missing percentage `P`, length `L`) triple becomes
-`output_dir/miss_<P>_files_<F>_len_<L>/`, in which only `F`% of the `.phy`
+`output_dir/miss_<P>_len_<L>_files_<F>/`, in which only `F`% of the `.phy`
 files have `P`% of their taxa removed; the remaining files keep all their
 taxa and are merely truncated to `L`. For example
 
@@ -43,7 +43,7 @@ python3 dataset_maker/trim_phy.py --input data/camus-dataset/n50 \
     --output data/trimmed --lengths 500 --missing 50 --file-percents 50
 ```
 
-writes `miss_50_files_50_len_500/`: half the genes lose half their taxa, the
+writes `miss_50_len_500_files_50/`: half the genes lose half their taxa, the
 other half stay complete, and every sequence keeps its original length. This
 models the realistic case where only some gene trees suffer from missing
 taxa. A file percentage of `100` reduces every file, which is the default
@@ -93,7 +93,7 @@ python3 dataset_maker/trim_phy.py \
     --missing 0 20 50 --outgroup OUT --seed 581
 
 # remove taxa from only a fraction of the genes
-# (miss_<P>_files_<F>_len_<L>/)
+# (miss_<P>_len_<L>_files_<F>/)
 python3 dataset_maker/trim_phy.py \
     --input data/camus-dataset/n50 \
     --output data/trimmed \
@@ -128,8 +128,8 @@ the case where only some gene trees suffer from missing taxa:
 
 | Dataset | Genes with 50% of taxa dropped | Genes complete |
 |---|---|---|
-| `miss_50_files_50_len_500` | 50% | 50% |
-| `miss_50_files_80_len_500` | 80% | 20% |
+| `miss_50_len_500_files_50` | 50% | 50% |
+| `miss_50_len_500_files_80` | 80% | 20% |
 
 Every sequence stays 500 sites long and the outgroup is never removed, so the
 effect of missing taxa is isolated from gene-tree estimation error. The
@@ -163,14 +163,14 @@ job. Run it on the login node, not via `sbatch`:
 bash dataset_maker/run_partial_miss_trees.sh
 
 # just one of the two datasets
-bash dataset_maker/run_partial_miss_trees.sh miss_50_files_50_len_500
+bash dataset_maker/run_partial_miss_trees.sh miss_50_len_500_files_50
 ```
 
 Each job writes straight to the same layout as the other datasets:
 
 ```
-data/gene_trees/miss_50_files_50_len_500/{00..49}/iqtree_500.nwk
-data/gene_trees/miss_50_files_80_len_500/{00..49}/iqtree_500.nwk
+data/gene_trees/miss_50_len_500_files_50/{00..49}/iqtree_500.nwk
+data/gene_trees/miss_50_len_500_files_80/{00..49}/iqtree_500.nwk
 ```
 
 One ML tree per line, in gene order, for the 1000 genes of that replicate,

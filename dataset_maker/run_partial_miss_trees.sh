@@ -7,8 +7,8 @@
 #
 # Result, matching the layout of the other datasets:
 #
-#   data/gene_trees/miss_50_files_50_len_500/{00..49}/iqtree_500.nwk
-#   data/gene_trees/miss_50_files_80_len_500/{00..49}/iqtree_500.nwk
+#   data/gene_trees/miss_50_len_500_files_50/{00..49}/iqtree_500.nwk
+#   data/gene_trees/miss_50_len_500_files_80/{00..49}/iqtree_500.nwk
 #
 # Each file holds one ML tree per line, in gene order, for the 1000 genes of
 # that replicate.
@@ -19,11 +19,11 @@
 #
 # Usage (from the repository root):
 #   bash dataset_maker/run_partial_miss_trees.sh
-#   bash dataset_maker/run_partial_miss_trees.sh miss_50_files_50_len_500
+#   bash dataset_maker/run_partial_miss_trees.sh miss_50_len_500_files_50
 set -eu
 
 PROJECT=/projects/illinois/eng/cs/warnow/quadros3/classes/cs581/cs581-final-project
-DATASETS=${*:-"miss_50_files_50_len_500 miss_50_files_80_len_500"}
+DATASETS=${*:-"miss_50_len_500_files_50 miss_50_len_500_files_80"}
 NAME=iqtree_500.nwk
 TRIMMED=data/trimmed
 GENE_TREES=data/gene_trees
