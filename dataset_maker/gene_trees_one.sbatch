@@ -15,7 +15,7 @@
 #       data/gene_trees/miss_50_len_500_files_50/00
 #SBATCH --time=20:00
 #SBATCH --job-name=gene-trees-one
-#SBATCH --partition=scavenger
+#SBATCH --partition=scavenger,secondary,cs
 #SBATCH --account=campusclusterusers
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=quadros3@illinois.edu
