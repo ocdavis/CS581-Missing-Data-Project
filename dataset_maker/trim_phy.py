@@ -36,8 +36,8 @@ their taxa and are merely truncated to the requested length::
 For example ``--lengths 500 --missing 50 --file-percents 50`` writes
 ``miss_50_len_500_files_50``: half the alignments lose half their ingroup
 taxa, the other half stay complete, and every sequence keeps its original
-length. A file percentage of 100 reduces every file, which is the default and
-keeps the plain ``miss_<P>_len_<L>`` names used by the existing datasets.
+length. The file percentage is always part of the name, so a condition that
+affects every gene is ``miss_50_len_500_files_100``.
 
 The number of files picked is exact, not sampled: the files are grouped by
 their parent directory (one group per ``seqs-500`` replicate) and, within each
@@ -304,12 +304,10 @@ def condition_dir(missing_percent: float, length: int,
                   file_percent: float = 100) -> str:
     """Directory name for one (file %, missing %, length) condition.
 
-    The ``_files_<F>`` suffix is left out when every file is reduced
-    (``F == 100``) so the datasets written before this option existed keep
-    their ``miss_<P>_len_<L>`` names.
+    The file percentage is always part of the name, including when every gene
+    is affected (``_files_100``), so a condition never has to be read as
+    "every gene" by the absence of a component.
     """
-    if file_percent >= 100:
-        return f"miss_{missing_percent:g}_len_{length}"
     return f"miss_{missing_percent:g}_len_{length}_files_{file_percent:g}"
 
 
@@ -351,8 +349,8 @@ def process_file(src: Path, input_dir: Path, output_dir: Path,
     requested. Without ``missing``, copies go to ``len_<L>/``. With
     ``missing``, every file percentage is crossed with every missing
     percentage and every length, and copies go to
-    ``miss_<P>_len_<L>_files_<F>/`` (plain ``miss_<P>_len_<L>/`` when ``F``
-    is 100, the default). A file percentage of ``F`` removes taxa only from
+    ``miss_<P>_len_<L>_files_<F>/``, where ``F`` is 100 when every gene is
+    affected. A file percentage of ``F`` removes taxa only from
     the files picked by :func:`file_selected`; the other files keep all their
     taxa and are merely truncated to the requested length. The taxa removed
     for a given percentage are the same at every length. Returns the list of

@@ -46,9 +46,9 @@ python3 dataset_maker/trim_phy.py --input data/camus-dataset/n50 \
 writes `miss_50_len_500_files_50/`: half the genes lose half their taxa, the
 other half stay complete, and every sequence keeps its original length. This
 models the realistic case where only some gene trees suffer from missing
-taxa. A file percentage of `100` reduces every file, which is the default
-when `file_percents` is absent and keeps the plain `miss_<P>_len_<L>/` names
-used by the existing datasets. `file_percents` requires `missing_percents`.
+taxa. The file percentage is always part of the name, so a condition that
+reduces every gene is `miss_<P>_len_<L>_files_100`; when `file_percents` is
+absent, `100` is used. `file_percents` requires `missing_percents`.
 
 The number of files picked is exact rather than sampled. Files are grouped by
 their parent directory (one group per `seqs-500` replicate) and, within each
@@ -185,6 +185,68 @@ replicate whose job failed. Passing a second argument to
 which removes the `iqtree-work` folder afterwards so `data/trimmed` stays
 free of intermediates; the script also prepends the conda environment's `bin`
 to `PATH` so `iqtree` is found without activating the environment first.
+
+### `run_extended_datasets.sbatch` + `run_extended_trees.sh`
+
+The extended set of conditions: shorter sequences, and 80% missing taxa.
+Nine datasets are generated, then gene trees inferred for each.
+
+| Dataset | Sites | Taxa dropped | Genes affected |
+|---|---|---|---|
+| `miss_0_len_50_files_100` | 50 | 0% | 100% |
+| `miss_0_len_25_files_100` | 25 | 0% | 100% |
+| `miss_50_len_500_files_95` | 500 | 50% | 95% |
+| `miss_50_len_500_files_99` | 500 | 50% | 99% |
+| `miss_80_len_500_files_100` | 500 | 80% | 100% |
+| `miss_80_len_500_files_50` | 500 | 80% | 50% |
+| `miss_80_len_500_files_80` | 500 | 80% | 80% |
+| `miss_80_len_500_files_95` | 500 | 80% | 95% |
+| `miss_80_len_500_files_99` | 500 | 80% | 99% |
+
+With 50 ingroup taxa, 80% removes 40 taxa, leaving 11 rows (10 ingroup plus
+the outgroup). Seed 581 is used throughout, so the taxa dropped from a given
+gene match the other missing-taxa datasets, and the file selection is the
+same nested draw used for the 50% conditions.
+
+A single `trim_phy.py` config cannot express these nine datasets, because a
+config crosses every length with every missing and file percentage; the
+sbatch therefore runs `trim_phy.py` three times with the parameters on the
+command line (one group per length/missing combination) instead of using a
+config file.
+
+```bash
+# from the repository root
+mkdir -p logs
+sbatch dataset_maker/run_extended_datasets.sbatch   # generate the datasets
+
+bash dataset_maker/run_extended_trees.sh            # queue the gene trees
+```
+
+`run_extended_trees.sh` submits one job per replicate — 9 datasets x 50
+replicates = 450 jobs — with `gene_trees_one.sbatch`, writing to
+`data/gene_trees/<dataset>/{00..49}/iqtree_500.nwk` in the same layout and
+with the same settings as the existing datasets (`GTR+G`, seed 581, 32
+concurrent IQ-TREE processes, `iqtree-work` removed on success).
+
+The account caps *running* jobs at 40, so only 40 run at a time and the rest
+wait in the queue; submission itself is not limited. Expect roughly
+`450/40 x 10 min` of wall time. Replicates whose `iqtree_500.nwk` already
+exists are skipped, so an interrupted batch can be relaunched and it will
+retry only what is missing; a single dataset can be submitted on its own:
+
+```bash
+bash dataset_maker/run_extended_trees.sh miss_0_len_25_files_100
+```
+
+The 25-site alignments (51 taxa, `GTR+G`) and the 11-taxon 80%-missing
+alignments were both checked to run cleanly through IQ-TREE.
+
+Note on naming: the file percentage is now always part of the directory name,
+including when every gene is affected (`_files_100`). The datasets generated
+before that rule was adopted keep their shorter names (`miss_0_len_100`,
+`miss_20_len_500`, `miss_50_len_500`, ...); regenerating them from a config
+with no `file_percents` would now write `_files_100` directories alongside
+the old ones rather than overwriting them.
 
 ## `true_tob.py`
 

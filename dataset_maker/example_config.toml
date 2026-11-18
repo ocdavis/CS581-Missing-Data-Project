@@ -24,8 +24,10 @@ missing_percents = [0, 20, 50]
 # Percentage of the .phy files that get the taxa removed above; crossed with
 # missing_percents and lengths, giving output_dir/miss_<P>_len_<L>_files_<F>/
 # The files not picked keep all their taxa and are only truncated.
-# 100 (the default when this key is absent) reduces every file and keeps the
-# plain miss_<P>_len_<L>/ names above. Requires missing_percents.
+# The file percentage is always part of the name: with this key absent, 100 is
+# used, so the datasets above would be written as miss_<P>_len_<L>_files_100/
+# (the datasets generated before this rule keep their shorter names).
+# Requires missing_percents.
 # The pick is seeded per file, so the realized fraction is approximately F.
 # With lengths = [500], file_percents = [50], missing_percents = [50] you get
 # miss_50_len_500_files_50: half the genes lose half their taxa, at full
