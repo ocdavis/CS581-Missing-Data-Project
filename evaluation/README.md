@@ -98,6 +98,68 @@ Files that cannot be compared (missing reference, unreadable tree, different
 taxa) are listed, the rest are still written, and the exit status is
 non-zero.
 
+## `polytomy_stats.py`
+
+Number of polytomies and largest polytomy degree of each estimated tree and
+of its reference, found with the same options as `compare_tob.py`. A polytomy
+is an internal node of degree 4 or more in the unrooted tree (one blob); its
+degree is the number of subtrees attached to it.
+
+```bash
+python3 evaluation/polytomy_stats.py --estimated data/gene_trees \
+    --glob tob-qmc.nwk "*.ectoblob.tre" \
+    --reference data/camus-dataset/n50 --output results/polytomy_stats.csv
+```
+
+## `plot_errors.py`
+
+Box plots of FN and FP per condition, one box per method, from one or
+more CSV files written by `compare_tob.py` (needs matplotlib):
+
+```bash
+python3 evaluation/plot_errors.py results/base_tree_errors.csv \
+    results/tob_qmc_errors.csv results/ectoblob_errors.csv \
+    --output results/fn_fp.jpg --title "CAMUS n50"
+```
+
+Rates are plotted by default and `--counts` plots branches per tree.
+`--conditions miss_0_len_500 miss_0_len_200 miss_0_len_100` limits the
+figure to the named conditions, `--xlabel` sets the text under the x axis,
+and the extension of `--output` picks the format (`.jpg`, `.png`, `.pdf`, `.svg`).
+Both panels share one scale. A method with no rows for a condition has no
+box there.
+
+## `plot_overview.py`
+
+All experiments on one page: one row per experiment (sequence length, taxa
+missing from every gene, 50% and 80% of taxa missing from a share of the
+genes), FN rate on the left and FP rate on the right, on one scale.
+
+```bash
+python3 evaluation/plot_overview.py results/base_tree_errors.csv \
+    results/tob_qmc_errors.csv results/ectoblob_errors.csv \
+    --output results/overview.jpg
+```
+
+The scale stops at 70% by default; values above it (trees with no internal
+branches have a false negative rate of 100%) are drawn as triangles at the
+top edge. `--top 100` shows the full scale. The rows and their conditions
+are listed at the top of the script.
+
+## Result files (`../results`)
+
+| File | Contents |
+|---|---|
+| `tob_qmc_errors.csv` | FN/FP of TOB-QMC, 16 conditions x 50 replicates |
+| `base_tree_errors.csv` | FN/FP of the TREE-QMC base trees, same conditions |
+| `ectoblob_errors.csv` | FN/FP of ECToBlob, the 13 conditions it ran on |
+| `tob_qmc_polytomies.csv` | polytomy counts and degrees of TOB-QMC and the true trees |
+| `overview.jpg`, `fn_fp_*.jpg`, `polytomies.jpg` | figures made by the plotting scripts |
+
+The base-tree rows of the nine conditions added last (25 and 50 sites, 95%
+and 99% of genes, 80% of taxa missing) were computed from
+`tob-qmc.pvalues.nwk`, which is the base tree with p-value labels.
+
 Contracting can only remove branches, so for a tree of blobs built from a
 base tree the base tree's FN is the lowest FN the method can reach; running
 the script on the base trees (`tree-qmc.nwk`) gives that floor.
