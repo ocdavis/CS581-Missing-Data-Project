@@ -8,7 +8,7 @@ line is the median, the box the quartiles, the whiskers reach the furthest
 value within 1.5 box lengths, and dots are values beyond that.
 
     python3 evaluation/plot_errors.py results/base_tree_errors.csv \\
-        results/tob_qmc_errors.csv --output results/fn_fp.png
+        results/tob_qmc_errors.csv --output results/fn_fp.jpg
 
 Any number of CSV files can be given, so ECToBlob's is simply added to the
 list. Rates (percent) are plotted by default; ``--counts`` plots numbers of
@@ -73,9 +73,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("csv", nargs="+", type=Path,
                         help="CSV file(s) written by compare_tob.py")
-    parser.add_argument("--output", type=Path, default=Path("fn_fp.png"),
+    parser.add_argument("--output", type=Path, default=Path("fn_fp.jpg"),
                         help="image file; the extension picks the format "
-                             "(.png, .pdf, .svg) (default: fn_fp.png)")
+                             "(.jpg, .png, .pdf, .svg) (default: fn_fp.jpg)")
     parser.add_argument("--counts", action="store_true",
                         help="plot numbers of branches instead of rates")
     parser.add_argument("--conditions", nargs="+", metavar="NAME",

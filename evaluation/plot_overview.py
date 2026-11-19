@@ -8,7 +8,7 @@ compare_tob.py:
 
     python3 evaluation/plot_overview.py results/base_tree_errors.csv \\
         results/tob_qmc_errors.csv results/ectoblob_errors.csv \\
-        --output results/overview.png
+        --output results/overview.jpg
 
 Values above the top of the scale (trees with no internal branches have a
 false negative rate of 100%) are drawn as triangles at the top edge. Needs
@@ -56,7 +56,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("csv", nargs="+", type=Path,
                         help="CSV file(s) written by compare_tob.py")
-    parser.add_argument("--output", type=Path, default=Path("overview.png"))
+    parser.add_argument("--output", type=Path, default=Path("overview.jpg"))
     parser.add_argument("--top", type=float, default=70,
                         help="top of the rate scale in percent (default: 70)")
     args = parser.parse_args()

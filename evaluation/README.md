@@ -119,13 +119,13 @@ more CSV files written by `compare_tob.py` (needs matplotlib):
 ```bash
 python3 evaluation/plot_errors.py results/base_tree_errors.csv \
     results/tob_qmc_errors.csv results/ectoblob_errors.csv \
-    --output results/fn_fp.png --title "CAMUS n50"
+    --output results/fn_fp.jpg --title "CAMUS n50"
 ```
 
 Rates are plotted by default and `--counts` plots branches per tree.
 `--conditions miss_0_len_500 miss_0_len_200 miss_0_len_100` limits the
 figure to the named conditions, `--xlabel` sets the text under the x axis,
-and the extension of `--output` picks the format (`.png`, `.pdf`, `.svg`).
+and the extension of `--output` picks the format (`.jpg`, `.png`, `.pdf`, `.svg`).
 Both panels share one scale. A method with no rows for a condition has no
 box there.
 
@@ -138,7 +138,7 @@ genes), FN rate on the left and FP rate on the right, on one scale.
 ```bash
 python3 evaluation/plot_overview.py results/base_tree_errors.csv \
     results/tob_qmc_errors.csv results/ectoblob_errors.csv \
-    --output results/overview.png
+    --output results/overview.jpg
 ```
 
 The scale stops at 70% by default; values above it (trees with no internal
@@ -154,7 +154,7 @@ are listed at the top of the script.
 | `base_tree_errors.csv` | FN/FP of the TREE-QMC base trees, same conditions |
 | `ectoblob_errors.csv` | FN/FP of ECToBlob, the 13 conditions it ran on |
 | `tob_qmc_polytomies.csv` | polytomy counts and degrees of TOB-QMC and the true trees |
-| `overview.png`, `fn_fp_*.png` | figures made by the two plotting scripts |
+| `overview.jpg`, `fn_fp_*.jpg`, `polytomies.jpg` | figures made by the plotting scripts |
 
 The base-tree rows of the nine conditions added last (25 and 50 sites, 95%
 and 99% of genes, 80% of taxa missing) were computed from
