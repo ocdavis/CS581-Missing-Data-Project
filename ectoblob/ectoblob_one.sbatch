@@ -11,16 +11,16 @@
 # ectoblob/avian_config.toml for the avian dataset:
 #
 #   sbatch ectoblob/ectoblob_one.sbatch data/avian ectoblob/avian_config.toml
-#SBATCH --time=04:00:00
+#SBATCH --time=4:00:00
 #SBATCH --job-name=ectoblob-one
-#SBATCH --partition=secondary
+#SBATCH --partition=secondary,cs,scavenger
 #SBATCH --account=campusclusterusers
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=quadros3@illinois.edu
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64g
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128g
 #SBATCH --output=logs/ectoblob_one_%j_log.txt
 
 set -eu
